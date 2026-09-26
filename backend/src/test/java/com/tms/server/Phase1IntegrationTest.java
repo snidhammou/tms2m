@@ -180,6 +180,25 @@ class Phase1IntegrationTest {
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
         assertThat(new String(content)).isEqualTo("ligne1\nligne2");
 
+        // Logs par application : 20 000 lignes par défaut, fenêtre "depuis N minutes" plafonnée à 24 h
+        JsonNode perApp = json(admin(post("/api/admin/v1/deployments"), "{\"type\":\"EXTRACT_LOGS\",\"packageName\":\"com.acme.pay\","
+                + "\"logSinceMinutes\":5000,\"target\":{\"terminalIds\":[" + terminalId + "]}}"), 201);
+        JsonNode perAppTask = json(adminGet("/api/admin/v1/tasks?deploymentId=" + perApp.get("deploymentId").asText()), 200).get(0);
+        assertThat(perAppTask.get("payload").get("packageName").asText()).isEqualTo("com.acme.pay");
+        assertThat(perAppTask.get("payload").get("lines").asInt()).isEqualTo(20000);
+        assertThat(perAppTask.get("payload").get("sinceMinutes").asInt()).isEqualTo(1440);
+
+        // Plage "du … au …" et plus de 20 000 lignes
+        JsonNode range = json(admin(post("/api/admin/v1/deployments"), "{\"type\":\"EXTRACT_LOGS\",\"logLines\":150000,"
+                + "\"logFrom\":\"2026-09-26T20:00:00Z\",\"logTo\":\"2026-09-26T21:00:00Z\",\"target\":{\"terminalIds\":[" + terminalId + "]}}"), 201);
+        JsonNode rangeTask = json(adminGet("/api/admin/v1/tasks?deploymentId=" + range.get("deploymentId").asText()), 200).get(0);
+        assertThat(rangeTask.get("payload").get("lines").asInt()).isEqualTo(150000);
+        assertThat(rangeTask.get("payload").get("fromEpochMs").asLong()).isEqualTo(Instant.parse("2026-09-26T20:00:00Z").toEpochMilli());
+        assertThat(rangeTask.get("payload").get("toEpochMs").asLong()).isEqualTo(Instant.parse("2026-09-26T21:00:00Z").toEpochMilli());
+        admin(post("/api/admin/v1/deployments"), "{\"type\":\"EXTRACT_LOGS\",\"logFrom\":\"2026-09-26T21:00:00Z\","
+                + "\"logTo\":\"2026-09-26T20:00:00Z\",\"target\":{\"terminalIds\":[" + terminalId + "]}}")
+                .andExpect(status().isBadRequest());
+
         // Extraction de fichier : chemin relatif refusé
         admin(post("/api/admin/v1/deployments"), "{\"type\":\"EXTRACT_FILE\",\"filePath\":\"sdcard/x\",\"target\":{\"terminalIds\":[" + terminalId + "]}}")
                 .andExpect(status().isBadRequest());

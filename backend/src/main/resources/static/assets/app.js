@@ -497,8 +497,10 @@ async function terminalDetail(id, tab = 'supervision') {
     });
     $$('[data-act]', body).forEach(b => b.onclick = () => {
         const type = b.dataset.act;
-        if (type === 'REBOOT' || type === 'DIAGNOSE' || type === 'EXTRACT_LOGS') {
+        if (type === 'REBOOT' || type === 'DIAGNOSE') {
             quickDeploy({ type }, id);
+        } else if (type === 'EXTRACT_LOGS') {
+            logsModal(t);
         } else {
             deployModal({ type, terminalIds: [Number(id)], apps });
         }
@@ -508,6 +510,69 @@ async function terminalDetail(id, tab = 'supervision') {
         const ok = await guarded(() => api('/terminals/' + id, { method: 'DELETE' }));
         if (ok !== undefined) { closeModal(); toast('Terminal supprimé'); views.terminals.render(); }
     };
+}
+
+const SINCE_OPTIONS = [['5', '5 dernières minutes'], ['15', '15 dernières minutes'], ['30', '30 dernières minutes'],
+    ['60', 'Dernière heure'], ['', 'Tout le journal']];
+
+/** Extraction de logs d'un terminal, par application (liste des applis installées) et par période. */
+function logsModal(t) {
+    const apps = (t.installedApps || []).slice().sort((a, b) => a.packageName.localeCompare(b.packageName));
+    const body = openModal(`Extraire les logs — ${t.serialNumber}`, `
+        <form class="form" id="logsForm">
+            <div class="form-row">
+                <label>Application<select name="packageName">
+                    <option value="">Toutes les applications</option>
+                    ${apps.map(a => `<option value="${esc(a.packageName)}">${esc(a.packageName)} ${esc(a.versionName || '')}</option>`).join('')}
+                </select></label>
+                <label>Période<select name="since">${SINCE_OPTIONS.map(([v, l]) => `<option value="${v}" ${v === '15' ? 'selected' : ''}>${l}</option>`).join('')}
+                    <option value="range">Plage personnalisée…</option></select></label>
+                <label>Nombre de lignes max<input name="logLines" type="number" value="2000" min="100" max="200000"></label>
+            </div>
+            <div class="form-row hidden" id="logRange">
+                <label>Du<input type="datetime-local" name="from" step="1"></label>
+                <label>Au<input type="datetime-local" name="to" step="1"></label>
+            </div>
+            <p class="muted hidden" id="logRangeHelp">Heures de votre navigateur, converties automatiquement dans le fuseau du terminal.
+                Le fichier (compressé en .gz) signale si le début de la plage n'est plus dans le journal du terminal.</p>
+            <p class="muted">Choisir une application ne garde que ses logs (le bruit du système — GPS, modem… — est écarté) et parcourt tout le journal.
+                Le journal Android est circulaire : extrayez les logs peu de temps après l'événement à analyser.</p>
+            <p class="muted">Les logs des autres applications exigent la permission READ_LOGS sur le terminal
+                (<span class="mono">adb shell pm grant com.tms.agent android.permission.READ_LOGS</span>).</p>
+            <div class="actions"><button class="btn primary">Extraire</button></div>
+        </form>`);
+    const f = $('#logsForm', body);
+    // Une application ou une plage choisie : 20 000 lignes par défaut (modifiable jusqu'à 200 000)
+    const adjustLines = () => { f.logLines.value = f.packageName.value || f.since.value === 'range' ? 20000 : 2000; };
+    f.packageName.addEventListener('change', adjustLines);
+    f.since.addEventListener('change', () => {
+        const range = f.since.value === 'range';
+        $('#logRange', f).classList.toggle('hidden', !range);
+        $('#logRangeHelp', f).classList.toggle('hidden', !range);
+        if (range && !f.from.value) {
+            // Pré-remplissage : l'heure écoulée
+            const local = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 19);
+            f.to.value = local(new Date());
+            f.from.value = local(new Date(Date.now() - 3600000));
+        }
+        adjustLines();
+    });
+    f.addEventListener('submit', async e => {
+        e.preventDefault();
+        const d = formData(f);
+        const range = d.since === 'range';
+        if (range && !d.from) { toast('Indiquez le début de la plage', true); return; }
+        const res = await guarded(() => api('/deployments', {
+            method: 'POST', body: {
+                type: 'EXTRACT_LOGS', packageName: orNull(d.packageName), logLines: numOrNull(d.logLines),
+                logSinceMinutes: range ? null : numOrNull(d.since),
+                logFrom: range ? new Date(d.from).toISOString() : null,
+                logTo: range && d.to ? new Date(d.to).toISOString() : null,
+                target: { terminalIds: [t.id] }
+            }
+        }));
+        if (res) { toast('Extraction des logs demandée'); terminalDetail(t.id, 'tasks'); }
+    });
 }
 
 async function quickDeploy(req, terminalId) {
@@ -552,15 +617,18 @@ async function deployModal({ type = 'INSTALL_APP', terminalIds = null, appId = n
                 <label>Action<select name="type">${options(meta.taskTypes, type, { label: t => TASK_LABELS[t] || t })}</select></label>
                 <label data-for="INSTALL_APP">Application<select name="appId">${options(appList, appId,
                     { value: a => a.id, label: a => `${a.label || a.packageName} ${a.versionName || ''} (${a.versionCode})` })}</select></label>
-                <label data-for="UNINSTALL_APP PUSH_PARAMS SET_AUTORUN">Package<input name="packageName" placeholder="com.acme.payment"></label>
-                <label data-for="EXTRACT_LOGS">Nombre de lignes<input name="logLines" type="number" value="2000" min="100" max="20000"></label>
+                <label data-for="UNINSTALL_APP PUSH_PARAMS SET_AUTORUN EXTRACT_LOGS">Package<input name="packageName" placeholder="com.acme.payment"></label>
+                <label data-for="EXTRACT_LOGS">Nombre de lignes<input name="logLines" type="number" value="2000" min="100" max="200000"></label>
+                <label data-for="EXTRACT_LOGS">Période<select name="logSince">${SINCE_OPTIONS.map(([v, l]) => `<option value="${v}" ${v === '15' ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
                 <label data-for="EXTRACT_FILE">Chemin du fichier sur le terminal<input name="filePath" placeholder="/sdcard/Download/journal.txt"></label>
             </div>
             <label data-for="SET_KIOSK">Applications autorisées en kiosque (une par ligne ; vide = désactiver le kiosque)
                 <textarea name="kioskPackages" placeholder="com.acme.payment"></textarea></label>
             <p class="muted" data-for="SET_AUTORUN">Laisser vide pour désactiver le démarrage automatique.</p>
             <p class="muted" data-for="SET_KIOSK REBOOT">Nécessite TMS2M Agent en Device Owner (ou le SDK du constructeur pour le redémarrage).</p>
-            <p class="muted" data-for="EXTRACT_LOGS">Android ne donne accès qu'aux logs de l'agent, sauf si l'agent est signé système.</p>
+            <p class="muted" data-for="EXTRACT_LOGS">Package facultatif : ne garde que les logs de cette application (ex. ma.s2m.pos.neompay).
+                Les logs des autres applications exigent la permission READ_LOGS sur le terminal
+                (<span class="mono">adb shell pm grant com.tms.agent android.permission.READ_LOGS</span>) ; sinon seuls ceux de l'agent sont remontés.</p>
             ${fixedTargets ? `<p class="muted">Cible : ${terminalIds.length} terminal(aux) sélectionné(s)</p>` : `
             <h4>Cible (filtres combinés)</h4>
             <div class="form-row">
@@ -609,6 +677,7 @@ async function deployModal({ type = 'INSTALL_APP', terminalIds = null, appId = n
         const req = {
             type: d.type, appId: d.type === 'INSTALL_APP' ? numOrNull(d.appId) : null, packageName: orNull(d.packageName),
             kioskPackages: lines(d.kioskPackages), filePath: orNull(d.filePath), logLines: numOrNull(d.logLines),
+            logSinceMinutes: d.type === 'EXTRACT_LOGS' ? numOrNull(d.logSince) : null,
             target, schedule
         };
         const res = await guarded(() => api('/deployments', { method: 'POST', body: req }));

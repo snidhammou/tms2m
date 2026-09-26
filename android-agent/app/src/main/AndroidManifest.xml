@@ -36,6 +36,11 @@
     <uses-permission
         android:name="android.permission.READ_PRIVILEGED_PHONE_STATE"
         tools:ignore="ProtectedPermissions" />
+    <!-- Logs de toutes les applications (extraction à distance). Permission "développement" :
+         adb shell pm grant com.tms.agent android.permission.READ_LOGS (une fois par terminal) -->
+    <uses-permission
+        android:name="android.permission.READ_LOGS"
+        tools:ignore="ProtectedPermissions" />
 
     <application
         android:name=".AgentApp"

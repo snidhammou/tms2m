@@ -17,7 +17,9 @@ import java.util.*;
 public class TaskService {
 
     private static final int DEFAULT_LOG_LINES = 2000;
-    private static final int MAX_LOG_LINES = 20000;
+    /** Fichier compressé par l'agent (≈ 10x) : 200 000 lignes restent sous la limite de téléversement. */
+    private static final int MAX_LOG_LINES = 200_000;
+    private static final int DEFAULT_APP_LOG_LINES = 20_000;
 
     private final TaskRepository tasks;
     private final TerminalRepository terminals;
@@ -137,8 +139,27 @@ public class TaskService {
             case SET_KIOSK -> payload.put("packages", req.kioskPackages() == null ? List.of()
                     : req.kioskPackages().stream().map(String::trim).filter(s -> !s.isEmpty()).distinct().toList());
             case EXTRACT_LOGS -> {
-                int lines = req.logLines() == null ? DEFAULT_LOG_LINES : req.logLines();
+                boolean perApp = req.packageName() != null && !req.packageName().isBlank();
+                // Filtre par application : tout le journal est parcouru, on peut donc garder plus de lignes
+                int lines = req.logLines() != null ? req.logLines()
+                        : perApp || req.logFrom() != null ? DEFAULT_APP_LOG_LINES : DEFAULT_LOG_LINES;
                 payload.put("lines", Math.max(100, Math.min(lines, MAX_LOG_LINES)));
+                // Facultatif : ne garder que les logs de cette application (READ_LOGS requise sur le terminal)
+                if (perApp) {
+                    payload.put("packageName", req.packageName().trim());
+                }
+                // Facultatif : plage "du … au …" (prioritaire), ou les N dernières minutes (1 min à 24 h)
+                if (req.logFrom() != null) {
+                    if (req.logTo() != null && !req.logTo().isAfter(req.logFrom())) {
+                        throw ApiException.badRequest("Plage de logs invalide : la fin doit être après le début");
+                    }
+                    payload.put("fromEpochMs", req.logFrom().toEpochMilli());
+                    if (req.logTo() != null) {
+                        payload.put("toEpochMs", req.logTo().toEpochMilli());
+                    }
+                } else if (req.logSinceMinutes() != null && req.logSinceMinutes() > 0) {
+                    payload.put("sinceMinutes", Math.min(req.logSinceMinutes(), 1440));
+                }
             }
             case EXTRACT_FILE -> {
                 String path = req.filePath() == null ? "" : req.filePath().trim();

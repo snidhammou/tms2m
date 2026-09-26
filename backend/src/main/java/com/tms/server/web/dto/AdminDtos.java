@@ -165,11 +165,13 @@ public final class AdminDtos {
 
     /**
      * Paramètres selon le type : appId (INSTALL_APP), packageName (UNINSTALL_APP, PUSH_PARAMS,
-     * SET_AUTORUN), kioskPackages (SET_KIOSK), filePath (EXTRACT_FILE), logLines (EXTRACT_LOGS).
+     * SET_AUTORUN, et filtre facultatif pour EXTRACT_LOGS), kioskPackages (SET_KIOSK),
+     * filePath (EXTRACT_FILE), logLines et logSinceMinutes (EXTRACT_LOGS).
      */
     public record DeploymentRequest(
             @NotNull TaskType type, Long appId, String packageName, List<String> kioskPackages,
-            String filePath, Integer logLines, @NotNull DeploymentTarget target, Schedule schedule) {
+            String filePath, Integer logLines, Integer logSinceMinutes, Instant logFrom, Instant logTo,
+            @NotNull DeploymentTarget target, Schedule schedule) {
     }
 
     public record DeploymentResponse(String deploymentId, int taskCount) {

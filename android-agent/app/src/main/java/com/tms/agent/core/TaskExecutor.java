@@ -85,7 +85,9 @@ public class TaskExecutor {
                     report(task.id, "SUCCESS", diagnostics.summary(report), report);
                     return;
                 case "EXTRACT_LOGS":
-                    result = diagnostics.extractLogs(task.id, (int) task.payloadLong("lines", 2000));
+                    result = diagnostics.extractLogs(task.id, (int) task.payloadLong("lines", 2000),
+                            task.payloadString("packageName"), (int) task.payloadLong("sinceMinutes", 0),
+                            task.payloadLong("fromEpochMs", 0), task.payloadLong("toEpochMs", 0));
                     break;
                 case "EXTRACT_FILE":
                     result = diagnostics.extractFile(task.id, required(task, "path"));

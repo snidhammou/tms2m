@@ -32,7 +32,7 @@ public class DeviceService {
     private static final EnumSet<TaskStatus> DELIVERABLE = EnumSet.of(TaskStatus.PENDING, TaskStatus.SENT);
     private static final EnumSet<TaskStatus> DEVICE_REPORTABLE =
             EnumSet.of(TaskStatus.IN_PROGRESS, TaskStatus.SUCCESS, TaskStatus.FAILED);
-    private static final long MAX_ARTIFACT_BYTES = 20L * 1024 * 1024;
+    private static final long MAX_ARTIFACT_BYTES = 50L * 1024 * 1024;
 
     private final TerminalRepository terminals;
     private final TaskRepository tasks;
@@ -130,7 +130,7 @@ public class DeviceService {
             throw ApiException.badRequest("Fichier manquant");
         }
         if (file.getSize() > MAX_ARTIFACT_BYTES) {
-            throw ApiException.badRequest("Fichier trop volumineux (max 20 Mo)");
+            throw ApiException.badRequest("Fichier trop volumineux (max 50 Mo)");
         }
         String original = sanitize(file.getOriginalFilename());
         String stored = "task-" + taskId + "-" + System.currentTimeMillis() + "-" + original;

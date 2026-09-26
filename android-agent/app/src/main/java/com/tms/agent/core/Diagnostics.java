@@ -102,34 +102,151 @@ public class Diagnostics {
                 + (Boolean.TRUE.equals(r.get("serverReachable")) ? "OK (" + r.get("serverLatencyMs") + " ms)" : "injoignable");
     }
 
+    /** Vrai si l'agent peut lire les logs de toutes les applications (READ_LOGS accordée par adb). */
+    public boolean canReadAllLogs() {
+        return app.checkCallingOrSelfPermission(android.Manifest.permission.READ_LOGS)
+                == android.content.pm.PackageManager.PERMISSION_GRANTED;
+    }
+
     /**
-     * Logs de l'agent (logcat). Android ne donne accès qu'aux logs de l'application elle-même,
-     * sauf aux applications signées système.
+     * Logs du terminal (logcat). Sans READ_LOGS, Android ne donne accès qu'aux logs de l'agent.
+     * {@code packageName} (facultatif) : ne garde que les logs du processus de cette application.
      */
-    public OpResult extractLogs(long taskId, int lines) throws Exception {
-        File out = new File(app.getCacheDir(), "tms-logs-" + taskId + ".txt");
-        int count = 0;
-        Process p = Runtime.getRuntime().exec(new String[]{"logcat", "-d", "-v", "time", "-t", String.valueOf(lines)});
-        try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
-             Writer w = new FileWriter(out)) {
-            w.write("# TMS2M Agent " + BuildConfig.VERSION_NAME + " - " + app.device().vendor() + " "
-                    + app.device().model() + " - SN " + app.device().serialNumber() + "\n");
+    /**
+     * @param fromEpochMs début de plage (0 = aucun) ; prioritaire sur {@code sinceMinutes}
+     * @param toEpochMs   fin de plage (0 = jusqu'à maintenant)
+     */
+    public OpResult extractLogs(long taskId, int lines, String packageName, int sinceMinutes,
+                                long fromEpochMs, long toEpochMs) throws Exception {
+        boolean full = canReadAllLogs();
+        // Bornes exprimées à l'heure locale du terminal, format des lignes "logcat -v time"
+        java.text.SimpleDateFormat logTime = new java.text.SimpleDateFormat("MM-dd HH:mm:ss.SSS", java.util.Locale.ROOT);
+        long fromMs = fromEpochMs > 0 ? fromEpochMs
+                : sinceMinutes > 0 ? System.currentTimeMillis() - sinceMinutes * 60_000L : 0;
+        String since = fromMs > 0 ? logTime.format(new java.util.Date(fromMs)) : null;   // "-T" de logcat
+        String until = toEpochMs > 0 ? logTime.format(new java.util.Date(toEpochMs)) : null;
+        boolean filtered = packageName != null && !packageName.isEmpty();
+        String uidTag = null;
+        java.util.regex.Pattern uidPattern = null;
+        if (filtered) {
+            if (!full && !packageName.equals(app.getPackageName())) {
+                return OpResult.fail("Logs de " + packageName + " inaccessibles : accordez READ_LOGS à l'agent "
+                        + "(adb shell pm grant com.tms.agent android.permission.READ_LOGS)");
+            }
+            try {
+                int uid = app.getPackageManager().getApplicationInfo(packageName, 0).uid;
+                uidTag = "uid " + uid;
+                uidPattern = java.util.regex.Pattern.compile("\\(\\s*(" + uid + "|" + uidName(uid) + ")\\s*:");
+            } catch (android.content.pm.PackageManager.NameNotFoundException e) {
+                return OpResult.fail("Application non installée : " + packageName);
+            }
+        }
+        // Filtre par application ou par période : on lit ce qu'il faut du journal, puis on garde les N dernières lignes.
+        java.util.List<String> args = new java.util.ArrayList<>(java.util.Arrays.asList("logcat", "-d", "-v", "time"));
+        if (filtered) {
+            args.add("-v");
+            args.add("uid");
+        }
+        if (since != null) {
+            args.add("-T");
+            args.add(since);
+        } else if (!filtered) {
+            args.add("-t");
+            args.add(String.valueOf(lines));
+        }
+        String[] cmd = args.toArray(new String[0]);
+        java.util.ArrayDeque<String> kept = new java.util.ArrayDeque<>();
+        long matched = 0;
+        // Ligne la plus ancienne encore présente dans le journal : si elle est postérieure au début
+        // de la plage demandée, le tampon circulaire a déjà écrasé ce début
+        String first = since != null ? oldestLogTimestamp() : null;
+        Process p = Runtime.getRuntime().exec(cmd);
+        try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
             String line;
             while ((line = in.readLine()) != null) {
-                w.write(line);
-                w.write('\n');
-                count++;
+                boolean stamped = line.length() >= 18 && Character.isDigit(line.charAt(0));
+                // Format "-v time -v uid" : "I/Tag(10157:17129): message" (uid numérique, parfois aligné par des espaces)
+                if (filtered && !uidPattern.matcher(line).find()) {
+                    continue;
+                }
+                // Fin de plage : l'horodatage "MM-dd HH:mm:ss.SSS" se compare comme une chaîne
+                if (until != null && stamped && line.substring(0, 18).compareTo(until) > 0) {
+                    continue;
+                }
+                matched++;
+                kept.addLast(line);
+                if (kept.size() > lines) {
+                    kept.removeFirst();
+                }
             }
         } finally {
             p.destroy();
         }
+        int count = kept.size();
+        boolean truncated = matched > count;
+        // Compression gzip : ≈ 10x plus léger pour du texte de logs
+        File out = new File(app.getCacheDir(), "tms-logs-" + taskId + ".txt.gz");
+        try (Writer w = new java.io.OutputStreamWriter(
+                new java.util.zip.GZIPOutputStream(new java.io.FileOutputStream(out)), "UTF-8")) {
+            w.write("# TMS2M Agent " + BuildConfig.VERSION_NAME + " - " + app.device().vendor() + " "
+                    + app.device().model() + " - SN " + app.device().serialNumber()
+                    + (filtered ? " - filtre " + packageName + " (" + uidTag + ")" : "") + "\n");
+            w.write("# Portée : " + (full ? "logs de toutes les applications (READ_LOGS)"
+                    : "logs de l'agent uniquement (READ_LOGS non accordée)") + "\n");
+            if (since != null || until != null) {
+                w.write("# Plage demandée (heure du terminal) : " + (since != null ? since : "début du journal")
+                        + " → " + (until != null ? until : "maintenant") + "\n");
+            }
+            if (since != null && first != null && first.compareTo(since) > 0) {
+                w.write("# ATTENTION : le journal du terminal ne remonte qu'à " + first
+                        + " (tampon circulaire) : le début de la plage n'est plus disponible\n");
+            }
+            if (truncated) {
+                w.write("# Tronqué : " + matched + " lignes trouvées, seules les " + count + " dernières sont incluses\n");
+            }
+            for (String l : kept) {
+                w.write(l);
+                w.write('\n');
+            }
+        }
         try {
-            upload(taskId, out, "logs-" + app.device().serialNumber() + ".txt");
+            upload(taskId, out, "logs-" + app.device().serialNumber()
+                    + (filtered ? "-" + packageName : "") + ".txt.gz");
         } finally {
             //noinspection ResultOfMethodCallIgnored
             out.delete();
         }
-        return OpResult.ok(count + " ligne(s) de logs remontée(s)");
+        return OpResult.ok(count + " ligne(s) de logs remontée(s)"
+                + (truncated ? " sur " + matched : "")
+                + (full ? " (toutes applications)" : " (agent uniquement, READ_LOGS non accordée)")
+                + (since != null && first != null && first.compareTo(since) > 0 ? " — journal disponible depuis " + first : ""));
+    }
+
+    /** Horodatage de la plus ancienne ligne du journal ("MM-dd HH:mm:ss.SSS"), ou null. */
+    private static String oldestLogTimestamp() {
+        try {
+            Process p = Runtime.getRuntime().exec(new String[]{"logcat", "-d", "-v", "time", "-m", "5"});
+            try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+                String line;
+                while ((line = in.readLine()) != null) {
+                    if (line.length() >= 18 && Character.isDigit(line.charAt(0))) {
+                        return line.substring(0, 18);
+                    }
+                }
+            } finally {
+                p.destroy();
+            }
+        } catch (Exception ignored) {
+            // indéterminable : pas d'avertissement
+        }
+        return null;
+    }
+
+    /** Nom d'utilisateur Linux affiché par "logcat -v uid" (ex. 10120 -> u0_a120). */
+    private static String uidName(int uid) {
+        int user = uid / 100000;
+        int appId = uid % 100000;
+        return appId >= 10000 ? "u" + user + "_a" + (appId - 10000) : String.valueOf(uid);
     }
 
     public OpResult extractFile(long taskId, String path) throws Exception {
