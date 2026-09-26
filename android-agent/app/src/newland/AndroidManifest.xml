@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Permission des services système Newland, requise par le MESDK -->
+    <uses-permission android:name="android.permission.MANAGE_NEWLAND" />
+
+    <!-- Le MESDK déclare la caméra comme obligatoire (scanner) : inutile pour l'agent TMS -->
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false"
+        tools:replace="android:required" />
+    <uses-feature
+        android:name="android.hardware.camera.autofocus"
+        android:required="false"
+        tools:replace="android:required" />
+</manifest>

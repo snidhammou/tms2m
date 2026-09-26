@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>TMS Console</title>
+    <link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+
+<section id="login" class="login hidden">
+    <form id="loginForm" class="login-card">
+        <div class="brand"><span class="logo">◈</span> TMS Console</div>
+        <p class="muted">Gestion multi-constructeur des terminaux<br>Newland · PAX · Sunmi · …</p>
+        <label>Utilisateur <input name="username" autocomplete="username" required></label>
+        <label>Mot de passe <input name="password" type="password" autocomplete="current-password" required></label>
+        <button class="btn primary" type="submit">Se connecter</button>
+        <p id="loginError" class="error"></p>
+    </form>
+</section>
+
+<div id="app" class="layout hidden">
+    <aside class="sidebar">
+        <div class="brand"><span class="logo">◈</span> TMS</div>
+        <nav id="nav">
+            <a data-view="dashboard">Tableau de bord</a>
+            <a data-view="terminals">Terminaux</a>
+            <a data-view="apps">Applications</a>
+            <a data-view="parameters">Paramètres</a>
+            <a data-view="tasks">Tâches</a>
+            <a data-view="merchants">Marchands</a>
+            <a data-view="groups">Groupes</a>
+        </nav>
+        <button id="logout" class="btn ghost">Déconnexion</button>
+    </aside>
+    <main>
+        <header class="topbar">
+            <h1 id="viewTitle"></h1>
+            <div id="viewActions"></div>
+        </header>
+        <div id="view"></div>
+    </main>
+</div>
+
+<dialog id="modal">
+    <div class="modal-head">
+        <h2 id="modalTitle"></h2>
+        <button class="btn ghost" data-close>✕</button>
+    </div>
+    <div id="modalBody"></div>
+</dialog>
+
+<div id="toast" class="toast"></div>
+
+<script src="assets/app.js"></script>
+</body>
+</html>

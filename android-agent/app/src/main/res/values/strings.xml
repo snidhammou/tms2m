@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TMS2M Agent</string>
+    <string name="channel_name">TMS2M Agent</string>
+    <string name="notif_starting">Démarrage de l\'agent…</string>
+
+    <string name="section_device">Terminal</string>
+    <string name="section_server">Serveur TMS</string>
+    <string name="section_status">État</string>
+
+    <string name="device_info">Constructeur : %1$s\nModèle      : %2$s\nN° série    : %3$s\nAndroid     : %4$s\nFirmware    : %5$s\nAgent       : %6$s\nPilote      : %7$s</string>
+
+    <string name="hint_server_url">URL du serveur (https://tms.exemple.com)</string>
+    <string name="hint_enrollment_key">Clé d\'enrôlement</string>
+    <string name="save_and_connect">Enregistrer et se connecter</string>
+    <string name="sync_now">Synchroniser</string>
+    <string name="reset_enrollment">Ré-enrôler</string>
+    <string name="reset_title">Ré-enrôler le terminal ?</string>
+    <string name="reset_message">Le jeton actuel sera oublié et un nouvel enrôlement sera effectué auprès du serveur.</string>
+
+    <string name="status_text">%1$s\nDernière synchro : %2$s\nIntervalle : %3$d s\n\n%4$s</string>
+    <string name="enrolled_as">Enrôlé — terminal #%1$d</string>
+    <string name="not_enrolled">Non enrôlé</string>
+    <string name="never">jamais</string>
+
+    <string name="saved">Configuration enregistrée</string>
+    <string name="sync_requested">Synchronisation demandée</string>
+    <string name="error_url">URL invalide (http:// ou https://)</string>
+    <string name="error_key">Clé requise</string>
+</resources>

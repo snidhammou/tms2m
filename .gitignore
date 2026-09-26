@@ -1,0 +1,26 @@
+# --- Build / Gradle ---
+.gradle/
+build/
+**/build/
+local.properties
+*.apk
+*.aab
+
+# --- IDE ---
+.idea/
+*.iml
+.vscode/
+captures/
+
+# --- Backend : base H2 de dev et APK uploadés ---
+backend/data/
+
+# --- SDK constructeurs propriétaires (sous NDA) : jamais versionnés ---
+# Voir android-agent/app/libs/README.md pour les récupérer.
+android-agent/app/libs/**/*.aar
+android-agent/app/libs/**/*.jar
+
+# --- Divers ---
+*.log
+.DS_Store
+Thumbs.db

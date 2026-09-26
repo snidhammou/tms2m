@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.TmsAgent" parent="Theme.AppCompat.DayNight.DarkActionBar">
+        <item name="colorPrimary">#2F6FDD</item>
+        <item name="colorPrimaryDark">#1F4FA8</item>
+        <item name="colorAccent">#2F6FDD</item>
+    </style>
+
+    <style name="SectionTitle">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">20dp</item>
+        <item name="android:layout_marginBottom">6dp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textColor">?attr/colorPrimary</item>
+    </style>
+</resources>

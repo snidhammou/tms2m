@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Android 11+ : rendre l'agent TMS visible pour pouvoir s'y lier -->
+    <queries>
+        <package android:name="com.tms.agent" />
+    </queries>
+
+    <application
+        android:allowBackup="false"
+        android:icon="@android:drawable/ic_dialog_info"
+        android:label="TMS Sample"
+        android:theme="@style/Theme.AppCompat.DayNight.DarkActionBar">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Notification de l'agent après un PUSH_PARAMS -->
+        <receiver
+            android:name=".ParamsReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.tms.agent.action.PARAMETERS_UPDATED" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

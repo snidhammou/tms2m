@@ -1,0 +1,50 @@
+server:
+  port: ${SERVER_PORT:8095}
+
+spring:
+  application:
+    name: tms-server
+  datasource:
+    # Base H2 fichier par défaut (dev). Profil "postgres" pour la production.
+    url: jdbc:h2:file:./data/tms;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  servlet:
+    multipart:
+      max-file-size: 512MB
+      max-request-size: 512MB
+
+tms:
+  enrollment:
+    # Clé partagée saisie dans l'agent Android lors de l'enrôlement
+    key: ${TMS_ENROLLMENT_KEY:CHANGE-ME-ENROLL-KEY}
+    # true  : tout terminal présentant la bonne clé est accepté
+    # false : seuls les numéros de série pré-enregistrés sont acceptés
+    auto-accept: ${TMS_AUTO_ACCEPT:true}
+  device:
+    poll-interval-seconds: ${TMS_POLL_INTERVAL:60}
+  storage:
+    apk-dir: ${TMS_APK_DIR:./data/apks}
+  admin:
+    username: ${TMS_ADMIN_USER:admin}
+    password: ${TMS_ADMIN_PASSWORD:admin123}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+---
+spring:
+  config:
+    activate:
+      on-profile: postgres
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/tms}
+    username: ${DB_USER:tms}
+    password: ${DB_PASSWORD:tms}
