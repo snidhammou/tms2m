@@ -23,6 +23,22 @@ public class AgentConfig {
 
     public AgentConfig(Context context) {
         prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        dropUnusableSavedServer();
+    }
+
+    /**
+     * Passage d'une version de test à une version de production : une URL "http://" enregistrée
+     * ne peut jamais fonctionner en release (HTTP clair interdit). On revient alors à l'URL et à la
+     * clé d'enrôlement de production compilées dans l'APK, et le terminal se ré-enrôle.
+     */
+    private void dropUnusableSavedServer() {
+        String saved = prefs.getString(K_SERVER_URL, null);
+        if (!BuildConfig.DEBUG && saved != null && saved.startsWith("http://")
+                && BuildConfig.DEFAULT_SERVER_URL.startsWith("https://")) {
+            android.util.Log.i("TmsAgent", "URL de test " + saved + " inutilisable en production : retour à "
+                    + BuildConfig.DEFAULT_SERVER_URL);
+            prefs.edit().remove(K_SERVER_URL).remove(K_ENROLL_KEY).remove(K_TOKEN).remove(K_TERMINAL_ID).commit();
+        }
     }
 
     public String getServerUrl() {
