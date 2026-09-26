@@ -432,6 +432,35 @@ function loadIcons(root) {
 // Toute icône insérée dans la page (vues, fiches, modales) est chargée automatiquement
 new MutationObserver(() => { if (auth) loadIcons(document); }).observe(document.body, { childList: true, subtree: true });
 
+
+// ------------------------------------------------------------------ Version de l'agent
+
+/** "1.0.3-sunmi" → "sunmi" ; "1.0.3" → "universal". */
+const agentVariant = v => (v || '').split('-')[1] || 'universal';
+/** "1.0.3-sunmi" → 10003 (comparaison de versions X.Y.Z). */
+const agentNum = v => (v || '').split('-')[0].split('.').reduce((n, p) => n * 100 + (parseInt(p, 10) || 0), 0);
+
+/** Dernière version publiée de l'agent par variante, à partir de la liste des APK du dépôt. */
+function agentLatestByVariant(apps) {
+    const latest = {};
+    (apps || []).filter(a => a.packageName === AGENT_PACKAGE).forEach(a => {
+        const v = agentVariant(a.versionName);
+        if (!latest[v] || a.versionCode > latest[v].versionCode) latest[v] = a;
+    });
+    return latest;
+}
+
+/** Version de l'agent d'un terminal : verte si à jour, orange avec la version disponible sinon. */
+function agentVersionBadge(t, latest) {
+    if (!t.agentVersion) return '<span class="muted">—</span>';
+    const short = esc(t.agentVersion.split('-')[0]);
+    const pub = latest[agentVariant(t.agentVersion)];
+    if (pub && agentNum(pub.versionName) > agentNum(t.agentVersion)) {
+        return `<span class="badge warn" title="${esc(t.agentVersion)} — ${esc(pub.versionName)} publiée, installation automatique en cours">v${short} ↑ ${esc(pub.versionName.split('-')[0])}</span>`;
+    }
+    return `<span class="badge ${pub ? 'ok' : ''}" title="${esc(t.agentVersion)}${pub ? ' — à jour' : ''}">v${short}</span>`;
+}
+
 // ------------------------------------------------------------------ Terminaux
 
 const terminalFilters = { manufacturer: '', status: '', organizationId: '', groupId: '', merchantId: '', q: '' };
@@ -449,8 +478,10 @@ views.terminals = {
         const r = await guarded(refs);
         if (!r) return;
         const qs = new URLSearchParams(Object.entries(terminalFilters).filter(([, v]) => v)).toString();
-        const list = await guarded(() => api('/terminals' + (qs ? '?' + qs : '')));
+        const [list, apps] = await Promise.all([api('/terminals' + (qs ? '?' + qs : '')), api('/apps')])
+            .catch(e => { toast(e.message, true); return []; });
         if (!list) return;
+        const latest = agentLatestByVariant(apps);
 
         const rows = list.map(t => `<tr class="clickable" data-id="${t.id}">
             <td class="ico-cell">${terminalIcon(t)}</td>
@@ -465,6 +496,7 @@ views.terminals = {
             <td>${esc(t.networkType) || '—'}</td>
             <td>${t.batteryLevel != null ? t.batteryLevel + ' %' : '—'}</td>
             <td>${t.deviceOwner ? '<span class="badge ok">DO</span>' : ''}</td>
+            <td>${agentVersionBadge(t, latest)}</td>
             <td>${fmtDate(t.lastSeenAt)}</td>
             <td><button class="btn sm" data-sync="${t.id}" title="Forcer la synchronisation">⟳</button></td></tr>`);
 
@@ -478,7 +510,7 @@ views.terminals = {
                 <select name="merchantId">${options(r.merchants, terminalFilters.merchantId, { value: m => m.id, label: m => m.name, empty: 'Tous marchands' })}</select>
             </form>
             <p class="muted">${list.length} terminal(aux)</p>
-            ${table(['', 'N° série', 'Constructeur', 'Modèle', 'Organisation', 'Marchand', 'Groupe', 'Statut', 'Connexion', 'Réseau', 'Batterie', '', 'Dernier contact', ''], rows, 'Aucun terminal. Installez TMS2M Agent ou pré-enregistrez un terminal.')}`;
+            ${table(['', 'N° série', 'Constructeur', 'Modèle', 'Organisation', 'Marchand', 'Groupe', 'Statut', 'Connexion', 'Réseau', 'Batterie', '', 'Agent', 'Dernier contact', ''], rows, 'Aucun terminal. Installez TMS2M Agent ou pré-enregistrez un terminal.')}`;
 
         const f = $('#termFilters');
         f.addEventListener('change', () => { Object.assign(terminalFilters, formData(f)); this.render(); });
@@ -582,7 +614,7 @@ async function terminalDetail(id, tab = 'supervision') {
             <div><span>Connexion</span><span class="dot ${t.online ? 'on' : ''}"></span>${t.online ? 'En ligne' : 'Hors ligne'}${realtimeMark(t)} · ${esc(t.networkType) || '—'}</div>
             <div><span>Dernier contact</span>${fmtDate(t.lastSeenAt)}</div>
             <div><span>Android / firmware</span>${esc(t.osVersion) || '—'} · ${esc(t.firmwareVersion) || '—'}</div>
-            <div><span>Agent</span>${esc(t.agentVersion) || '—'}</div>
+            <div><span>TMS2M Agent</span>${agentVersionBadge(t, agentLatestByVariant(apps))} <span class="muted">${esc(t.agentVersion && t.agentVersion.includes('-') ? t.agentVersion.split('-')[1] : '')}</span></div>
             <div><span>Device Owner</span>${t.deviceOwner ? '✅ oui' : 'non'}</div>
             <div><span>Batterie</span>${t.batteryLevel != null ? t.batteryLevel + ' %' : '—'}</div>
             <div><span>Stockage</span>${fmtBytes(storageUsed)} / ${fmtBytes(t.storageTotalBytes)}${meter(storageUsed, t.storageTotalBytes)}</div>
@@ -887,12 +919,7 @@ views.apps = {
                 <button class="btn sm danger" data-del="${a.id}">Supprimer</button></td></tr>`);
 
         // Dernière version publiée de l'agent, par variante constructeur (suffixe du versionName)
-        const variantOf = v => (v || '').split('-')[1] || 'universal';
-        const agentLatest = {};
-        apps.filter(a => a.packageName === AGENT_PACKAGE).forEach(a => {
-            const v = variantOf(a.versionName);
-            if (!agentLatest[v] || a.versionCode > agentLatest[v].versionCode) agentLatest[v] = a;
-        });
+        const agentLatest = agentLatestByVariant(apps);
         const agentCard = `<div class="card" style="margin-bottom:16px">
             <h3>TMS2M Agent — mise à jour automatique
                 ${meta.agentAutoUpdate ? '<span class="badge ok">activée</span>' : '<span class="badge">désactivée</span>'}</h3>

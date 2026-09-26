@@ -10,7 +10,7 @@ val tmsEnrollmentKey: String = (project.findProperty("tmsEnrollmentKey") as Stri
 // Version de l'agent : -PagentVersion=1.2.3 -> versionCode 10203x, x = variante (0 universal, 1 newland,
 // 2 pax, 3 sunmi) : toujours croissant, et unique par variante dans le dépôt du TMS.
 // Publier les APK dans le dépôt du TMS suffit : les terminaux se mettent à jour automatiquement.
-val agentVersion: String = (project.findProperty("agentVersion") as String?) ?: "1.0.1"
+val agentVersion: String = (project.findProperty("agentVersion") as String?) ?: "1.0.4"
 val agentVersionCode: Int = agentVersion.split(".").let { p ->
     require(p.size == 3 && p.all { it.toIntOrNull() in 0..99 }) { "agentVersion attendu au format X.Y.Z (0-99) : $agentVersion" }
     p[0].toInt() * 10000 + p[1].toInt() * 100 + p[2].toInt()

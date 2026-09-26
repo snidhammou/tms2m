@@ -44,3 +44,6 @@
 # Interface AIDL exposée aux applications de paiement
 -keep class com.tms.agent.ITmsAgentService { *; }
 -keep class com.tms.agent.ITmsAgentService$* { *; }
+
+# Nom lisible du pilote constructeur affiché dans l'app ("Pilote : SunmiDeviceManager")
+-keepnames class * implements com.tms.agent.device.DeviceManager

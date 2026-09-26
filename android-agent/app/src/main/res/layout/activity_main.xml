@@ -56,6 +56,22 @@
                     android:text="Agent"
                     android:textColor="#C9D1DC"
                     android:textSize="22sp" />
+
+                <!-- Version installée de l'agent (renseignée par MainActivity) -->
+                <TextView
+                    android:id="@+id/versionBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:layout_marginLeft="10dp"
+                    android:background="@drawable/version_badge"
+                    android:paddingLeft="8dp"
+                    android:paddingTop="2dp"
+                    android:paddingRight="8dp"
+                    android:paddingBottom="2dp"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <TextView

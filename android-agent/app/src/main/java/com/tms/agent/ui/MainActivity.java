@@ -48,6 +48,10 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         config = AgentApp.get().config();
 
+        // "1.0.3-sunmi" -> "v1.0.3" (la variante figure dans les infos du terminal)
+        TextView versionBadge = findViewById(R.id.versionBadge);
+        versionBadge.setText("v" + BuildConfig.VERSION_NAME.split("-")[0]);
+
         DeviceManager device = AgentApp.get().device();
         TextView deviceInfo = findViewById(R.id.deviceInfo);
         deviceInfo.setText(getString(R.string.device_info,

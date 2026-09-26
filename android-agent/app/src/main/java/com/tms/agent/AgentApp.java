@@ -13,6 +13,7 @@ import com.tms.agent.device.DeviceManagerFactory;
 public class AgentApp extends Application {
 
     public static final String CHANNEL_ID = "tms_agent";
+    public static final String CHANNEL_ACTIONS_ID = "tms_actions";
 
     private static AgentApp instance;
 
@@ -48,6 +49,10 @@ public class AgentApp extends Application {
             NotificationChannel channel = new NotificationChannel(CHANNEL_ID,
                     getString(R.string.channel_name), NotificationManager.IMPORTANCE_LOW);
             getSystemService(NotificationManager.class).createNotificationChannel(channel);
+            // Confirmations d'installation demandées par le TMS : notification visible (heads-up)
+            NotificationChannel actions = new NotificationChannel(CHANNEL_ACTIONS_ID,
+                    "Actions à confirmer", NotificationManager.IMPORTANCE_HIGH);
+            getSystemService(NotificationManager.class).createNotificationChannel(actions);
         }
     }
 }

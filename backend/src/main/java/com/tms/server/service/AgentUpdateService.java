@@ -25,7 +25,7 @@ import java.util.Optional;
 public class AgentUpdateService {
 
     public static final String AGENT_PACKAGE = "com.tms.agent";
-    /** Délai avant une nouvelle tentative après un échec (terminal occupé, refus à l'écran…). */
+    /** Délai avant un nouvel essai après un échec ou une confirmation restée sans réponse. */
     private static final Duration RETRY_AFTER_FAILURE = Duration.ofHours(6);
 
     private final AppPackageRepository apps;
@@ -66,13 +66,18 @@ public class AgentUpdateService {
         // Une tâche par (terminal, version) : pas de doublon, pas de boucle si l'installation échoue
         String marker = "agent-update:" + app.getId();
         Task last = tasks.findTopByTerminalIdAndDeploymentIdOrderByIdDesc(t.getId(), marker);
-        if (last != null && !(last.getStatus() == TaskStatus.FAILED
-                && last.getUpdatedAt().isBefore(Instant.now().minus(RETRY_AFTER_FAILURE)))) {
+        if (last != null && !isRetryable(last)) {
             return;
         }
         taskService.createTasks(List.of(t), TaskType.INSTALL_APP, taskService.installPayload(app), null, marker);
         audit.logSystem("AGENT_AUTO_UPDATE", t.getId(), t.getAgentVersion() + " → " + app.getVersionName()
                 + (last != null ? " (nouvel essai)" : ""));
+    }
+
+    /** Échec, ou confirmation à l'écran jamais faite : nouvel essai après le délai. */
+    private static boolean isRetryable(Task last) {
+        boolean stale = last.getUpdatedAt().isBefore(Instant.now().minus(RETRY_AFTER_FAILURE));
+        return stale && (last.getStatus() == TaskStatus.FAILED || last.getStatus() == TaskStatus.IN_PROGRESS);
     }
 
     /** Dernière version publiée de l'agent pour une variante ("" = universal, "pax", "newland"…). */

@@ -104,6 +104,13 @@ public class TaskExecutor {
             Log.e(TAG, "Tâche #" + task.id + " en échec", e);
             result = OpResult.fail(e.getClass().getSimpleName() + " : " + e.getMessage());
         }
+        if (result.awaitingUser != null) {
+            // Confirmation attendue à l'écran : la tâche reste en cours sans bloquer la synchronisation
+            report(task.id, "IN_PROGRESS", result.message);
+            result.awaitingUser.onLateResult(late -> new Thread(() ->
+                    report(task.id, late.success ? "SUCCESS" : "FAILED", late.message), "tms-late-result").start());
+            return;
+        }
         report(task.id, result.success ? "SUCCESS" : "FAILED", result.message);
     }
 
@@ -147,7 +154,8 @@ public class TaskExecutor {
                 config.setPendingSelfUpdate(task.id, versionCode);
             }
             OpResult r = device.installApk(apk, pkg);
-            if (selfUpdate) {
+            if (selfUpdate && r.awaitingUser == null) {
+                // En attente de confirmation : la clôture se fera au redémarrage de l'agent mis à jour
                 config.clearPendingSelfUpdate();
             }
             if (r.success && versionCode > 0) {
