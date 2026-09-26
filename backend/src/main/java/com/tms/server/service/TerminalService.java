@@ -32,12 +32,14 @@ public class TerminalService {
     private final AuditService audit;
     private final JsonSupport json;
     private final TmsProperties props;
+    private final SyncSignalService signals;
 
     public TerminalService(TerminalRepository terminals, MerchantRepository merchants, TerminalGroupRepository groups,
                            OrganizationRepository organizationRepo, TaskRepository tasks, AppPackageRepository apps,
                            ParameterRepository parameters, TerminalMetricRepository metrics,
                            OrganizationService organizations, TemplateService templates, AuditService audit,
-                           JsonSupport json, TmsProperties props) {
+                           JsonSupport json, TmsProperties props, SyncSignalService signals) {
+        this.signals = signals;
         this.terminals = terminals;
         this.merchants = merchants;
         this.groups = groups;
@@ -206,7 +208,17 @@ public class TerminalService {
                 t.getStorageTotalBytes(), t.getStorageFreeBytes(), t.getRamTotalBytes(), t.getRamAvailBytes(),
                 t.getNetworkType(), t.getUptimeSeconds(), t.getDeviceOwner(),
                 t.getAutoRunPackage(), json.readStringList(t.getKioskPackagesJson()),
-                withApps ? json.readApps(t.getInstalledAppsJson()) : null);
+                withApps ? json.readApps(t.getInstalledAppsJson()) : null,
+                signals.isConnected(t.getId()));
+    }
+
+    /** Synchronisation forcée depuis la console. */
+    @Transactional(readOnly = true)
+    public SyncResponse forceSync(Long id) {
+        Terminal t = find(id);
+        boolean delivered = signals.signal(id);
+        audit.log("FORCE_SYNC", id, t.getSerialNumber() + (delivered ? " (instantané)" : " (au prochain contact)"));
+        return new SyncResponse(delivered, Instant.now());
     }
 
     private Terminal find(Long id) {

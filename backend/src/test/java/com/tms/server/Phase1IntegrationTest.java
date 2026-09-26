@@ -10,9 +10,13 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
@@ -20,6 +24,7 @@ import java.time.ZoneOffset;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** Fonctionnalités "phase 1" inspirées de TOMS : organisations, zéro contact, planification, résultats. */
@@ -205,6 +210,41 @@ class Phase1IntegrationTest {
     }
 
     // ---- helpers ----
+
+    @Test
+    void forcedSyncWakesLongPollAndIconsAreCollected() throws Exception {
+        Files.deleteIfExists(Path.of("build/test-apks-p1/icons/com.acme.icon.png")); // runs précédents
+        JsonNode e = enroll("SYNC-001");
+        String token = e.get("deviceToken").asText();
+        long id = e.get("terminalId").asLong();
+
+        // Canal temps réel ouvert par l'agent
+        MvcResult waiting = mvc.perform(device(get("/api/device/v1/wait?timeout=30"), token))
+                .andExpect(request().asyncStarted()).andReturn();
+        assertThat(json(adminGet("/api/admin/v1/terminals/" + id), 200).get("realtime").asBoolean()).isTrue();
+
+        JsonNode sync = json(admin(post("/api/admin/v1/terminals/" + id + "/sync"), "{}"), 200);
+        assertThat(sync.get("delivered").asBoolean()).isTrue();
+        JsonNode woke = om.readTree(mvc.perform(asyncDispatch(waiting)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8));
+        assertThat(woke.get("sync").asBoolean()).isTrue();
+
+        // Terminal hors canal : le signal est conservé pour sa prochaine attente
+        assertThat(json(admin(post("/api/admin/v1/terminals/" + id + "/sync"), "{}"), 200)
+                .get("delivered").asBoolean()).isFalse();
+
+        // Icônes : le serveur réclame celles qu'il n'a pas, l'agent les envoie
+        JsonNode hb = json(device(post("/api/device/v1/heartbeat"), token).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"installedApps\":[{\"packageName\":\"com.acme.icon\",\"versionName\":\"1\",\"versionCode\":1}]}"), 200);
+        assertThat(hb.get("iconsWanted")).extracting(JsonNode::asText).containsExactly("com.acme.icon");
+        byte[] png = {(byte) 0x89, 'P', 'N', 'G', 13, 10, 26, 10, 0, 0};
+        mvc.perform(device(post("/api/device/v1/icons/com.acme.icon"), token)
+                .contentType(MediaType.IMAGE_PNG).content(png)).andExpect(status().isNoContent());
+        mvc.perform(device(post("/api/device/v1/icons/com.acme.bad"), token)
+                .contentType(MediaType.IMAGE_PNG).content("pas un png".getBytes())).andExpect(status().isBadRequest());
+        adminGet("/api/admin/v1/apps/icons/com.acme.icon").andExpect(status().isOk());
+        adminGet("/api/admin/v1/apps/icons/com.acme.unknown").andExpect(status().isNotFound());
+    }
 
     private JsonNode enroll(String serial) throws Exception {
         return json(mvc.perform(post("/api/device/v1/enroll").contentType(MediaType.APPLICATION_JSON)

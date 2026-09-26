@@ -1,6 +1,7 @@
 package com.tms.server.config;
 
 import com.tms.server.repository.AdminUserRepository;
+import jakarta.servlet.DispatcherType;
 import com.tms.server.repository.TerminalRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -27,6 +28,9 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // Reprise asynchrone du long polling (/api/device/v1/wait) : la requête
+                        // initiale a déjà été authentifiée ; la redispatch ASYNC n'a pas de contexte
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers("/api/device/v1/enroll").permitAll()
                         .requestMatchers("/api/device/**").hasRole("DEVICE")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")

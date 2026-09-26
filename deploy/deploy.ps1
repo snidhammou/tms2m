@@ -12,6 +12,14 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# PowerShell 5.1 transforme toute ligne stderr d'un exécutable (ex. avertissement Docker) en erreur
+# fatale sous "Stop" : on se fie au code de retour des commandes natives.
+function Invoke-Native([scriptblock]$cmd, [string]$what) {
+    $ErrorActionPreference = "Continue"
+    & $cmd 2>&1 | ForEach-Object { "$_" }
+    if ($LASTEXITCODE -ne 0) { throw "$what en échec (code $LASTEXITCODE)" }
+}
 $root = Split-Path $PSScriptRoot -Parent
 $envFile = Join-Path $PSScriptRoot ".env"
 if (-not (Test-Path $envFile)) { throw "deploy\.env manquant (lancer deploy\new-env.ps1)" }
@@ -21,13 +29,13 @@ $target = "$User@$Server"
 
 Write-Host "== Archive des sources (backend + deploy)"
 $archive = Join-Path $env:TEMP "tms2m-deploy.tar.gz"
-tar -czf $archive -C $root --exclude=backend/build --exclude=backend/.gradle --exclude=backend/data backend deploy
+Invoke-Native { tar -czf $archive -C $root --exclude=backend/build --exclude=backend/.gradle --exclude=backend/data backend deploy } "Archive"
 
 Write-Host "== Envoi vers $target"
-scp @ssh $archive "${target}:/tmp/tms2m-deploy.tar.gz"
+Invoke-Native { scp @ssh $archive "${target}:/tmp/tms2m-deploy.tar.gz" } "Envoi"
 
 Write-Host "== Déploiement"
 # sed : fichiers préparés sous Windows (CRLF) -> LF, sinon "\r" se colle aux valeurs du .env
-ssh @ssh $target "sudo mkdir -p /opt/tms2m && sudo tar -xzf /tmp/tms2m-deploy.tar.gz -C /opt/tms2m && cd /opt/tms2m/deploy && sudo sed -i 's/\r$//' .env Caddyfile docker-compose.yml && sudo chmod 600 .env && sudo docker compose --env-file .env up -d --build && sudo docker compose ps"
+Invoke-Native { ssh @ssh $target "sudo mkdir -p /opt/tms2m && sudo tar -xzf /tmp/tms2m-deploy.tar.gz -C /opt/tms2m && cd /opt/tms2m/deploy && sudo sed -i 's/\r$//' .env Caddyfile docker-compose.yml && sudo chmod 600 .env && sudo docker compose --env-file .env up -d --build && sudo docker compose ps" } "Déploiement"
 Remove-Item $archive
 Write-Host "Déploiement terminé."

@@ -25,6 +25,7 @@ public class SyncEngine {
     private final StatusOutbox outbox;
     private final DeviceInfo deviceInfo;
     private final TaskExecutor tasks;
+    private final IconUploader icons;
 
     public SyncEngine(AgentApp app) {
         this.app = app;
@@ -34,18 +35,20 @@ public class SyncEngine {
         this.outbox = new StatusOutbox(app);
         this.deviceInfo = new DeviceInfo(app, device, config);
         this.tasks = new TaskExecutor(app, client, outbox, new ParameterStore(app), deviceInfo);
+        this.icons = new IconUploader(app);
     }
 
     private boolean permissionsGranted;
 
-    public void runOnce() {
+    /** @return vrai si des tâches ont été exécutées (un heartbeat rapproché rafraîchit alors l'inventaire). */
+    public boolean runOnce() {
         if (!config.isConfigured()) {
             status("Non configuré : renseignez l'URL du serveur et la clé d'enrôlement");
-            return;
+            return false;
         }
         try {
             if (!config.isEnrolled() && !enroll()) {
-                return;
+                return false;
             }
             if (!permissionsGranted) {
                 // En Device Owner : position et lecture de fichiers accordées sans intervention à l'écran
@@ -60,11 +63,11 @@ public class SyncEngine {
             if (resp.code() == 401) {
                 config.clearEnrollment();
                 status("Jeton refusé par le serveur : ré-enrôlement au prochain cycle");
-                return;
+                return false;
             }
             if (!resp.isSuccessful() || resp.body() == null) {
                 status("Heartbeat refusé : HTTP " + resp.code());
-                return;
+                return false;
             }
             Dtos.HeartbeatResponse hb = resp.body();
             if (hb.pollIntervalSeconds > 0) {
@@ -73,19 +76,21 @@ public class SyncEngine {
             config.markSynced();
 
             int count = hb.tasks == null ? 0 : hb.tasks.size();
-            if (count == 0) {
-                status("Synchronisé");
-                return;
+            if (count > 0) {
+                status(count + " tâche(s) en cours…");
+                for (Dtos.DeviceTask task : hb.tasks) {
+                    tasks.execute(task);
+                }
             }
-            status(count + " tâche(s) en cours…");
-            for (Dtos.DeviceTask task : hb.tasks) {
-                tasks.execute(task);
-            }
-            status("Synchronisé — " + count + " tâche(s) traitée(s)");
+            icons.upload(client.api(), hb.iconsWanted);
+            status(count == 0 ? "Synchronisé" : "Synchronisé — " + count + " tâche(s) traitée(s)");
+            return count > 0;
         } catch (IOException e) {
             status("Serveur injoignable : " + e.getMessage());
+            return false;
         } catch (IllegalArgumentException e) {
             status(e.getMessage());
+            return false;
         }
     }
 

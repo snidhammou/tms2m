@@ -58,7 +58,9 @@ public final class DeviceDtos {
     public record DeviceTask(Long id, TaskType type, Map<String, Object> payload) {
     }
 
-    public record HeartbeatResponse(Instant serverTime, int pollIntervalSeconds, List<DeviceTask> tasks) {
+    /** {@code iconsWanted} : packages installés dont le serveur n'a pas encore l'icône. */
+    public record HeartbeatResponse(Instant serverTime, int pollIntervalSeconds, List<DeviceTask> tasks,
+                                    List<String> iconsWanted) {
     }
 
     /** {@code result} : rapport structuré (diagnostic…), stocké tel quel. */

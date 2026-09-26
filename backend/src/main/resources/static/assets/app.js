@@ -3,6 +3,7 @@
 /* Console d'administration TMS2M — SPA vanilla JS sur l'API /api/admin/v1 */
 
 const API = '/api/admin/v1';
+const AGENT_PACKAGE = 'com.tms.agent';
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
@@ -24,7 +25,7 @@ const AUDIT_LABELS = {
     TASK_CANCELLED: 'Tâche annulée', TERMINAL_REGISTERED: 'Pré-enregistrement', BULK_REGISTER: 'Pré-enregistrement par lots',
     TERMINAL_STATUS: 'Changement de statut', TERMINAL_GROUP: 'Changement de groupe', TERMINAL_DELETED: 'Terminal supprimé',
     PARAMETERS_SAVED: 'Paramètres enregistrés', PARAM_TEMPLATE_APPLIED: 'Modèle de paramètres appliqué',
-    GROUP_TEMPLATE: 'Modèle de groupe'
+    GROUP_TEMPLATE: 'Modèle de groupe', FORCE_SYNC: 'Synchronisation forcée'
 };
 
 // ------------------------------------------------------------------ utils
@@ -204,6 +205,7 @@ function navigate(view) {
 $$('#nav a').forEach(a => a.addEventListener('click', () => navigate(a.dataset.view)));
 
 function openModal(title, html) {
+    openDetail = null; // la fiche terminal le repositionne après son propre openModal
     $('#modalTitle').textContent = title;
     $('#modalBody').innerHTML = html;
     const m = $('#modal');
@@ -277,6 +279,159 @@ views.dashboard = {
     }
 };
 
+
+// ------------------------------------------------------------------ Notifications (en bas à gauche)
+
+/** kind : ok | err | info. Fermeture automatique (plus longue pour les erreurs) ou par ✕. */
+function notify(title, detail = '', kind = 'info') {
+    const box = document.createElement('div');
+    box.className = 'notif ' + kind;
+    box.innerHTML = `<span class="ico">${{ ok: '✅', err: '❌', info: 'ℹ️' }[kind] || 'ℹ️'}</span>
+        <div class="txt"><b>${esc(title)}</b>${detail ? `<div>${esc(detail)}</div>` : ''}</div>
+        <button class="close" title="Fermer">✕</button>`;
+    const close = () => { box.classList.add('leaving'); setTimeout(() => box.remove(), 250); };
+    box.querySelector('.close').onclick = close;
+    $('#notifs').appendChild(box);
+    setTimeout(close, kind === 'err' ? 20000 : 10000);
+}
+
+/** Terminal affiché dans la fiche ouverte (pour la rafraîchir quand une tâche se termine). */
+let openDetail = null;
+
+function refreshOpenDetail(terminalIds, delayMs = 0) {
+    setTimeout(() => {
+        if (openDetail && $('#modal').open && terminalIds.map(Number).includes(Number(openDetail.id))) {
+            terminalDetail(openDetail.id, openDetail.tab);
+        }
+    }, delayMs);
+}
+
+const FINAL = ['SUCCESS', 'FAILED', 'CANCELLED'];
+
+/** Suit un déploiement jusqu'à la fin de toutes ses tâches, puis affiche une notification. */
+function watchDeployment(deploymentId, label) {
+    const started = Date.now();
+    const tick = async () => {
+        let list;
+        try { list = await api('/tasks?deploymentId=' + encodeURIComponent(deploymentId)); } catch (e) { list = null; }
+        if (list && list.length && list.every(k => FINAL.includes(k.status))) {
+            const ko = list.filter(k => k.status !== 'SUCCESS');
+            if (list.length === 1) {
+                const k = list[0];
+                notify(`${label} — ${k.serialNumber}`, k.message || (k.status === 'SUCCESS' ? 'Terminé' : k.status),
+                    k.status === 'SUCCESS' ? 'ok' : 'err');
+            } else {
+                notify(label, `${list.length - ko.length} réussie(s), ${ko.length} en échec sur ${list.length} terminal(aux)`,
+                    ko.length ? 'err' : 'ok');
+            }
+            // L'inventaire arrive au heartbeat qui suit la tâche (≈ 3 s) : léger délai pour les applications
+            const inventory = list.some(k => ['INSTALL_APP', 'UNINSTALL_APP'].includes(k.type));
+            refreshOpenDetail(list.map(k => k.terminalId), inventory ? 5000 : 0);
+            if (currentView === 'tasks') views.tasks.render();
+            return;
+        }
+        // Terminaux hors ligne : on arrête de suivre au bout de 30 min
+        if (Date.now() - started > 30 * 60000) {
+            notify(label, 'Toujours en cours après 30 min — suivez-la dans « Tâches »', 'info');
+            return;
+        }
+        setTimeout(tick, 3000);
+    };
+    setTimeout(tick, 1500);
+}
+
+/** Crée un déploiement et le suit (sauf s'il est planifié) ; renvoie la réponse ou undefined. */
+async function deployAndWatch(req, label) {
+    const res = await guarded(() => api('/deployments', { method: 'POST', body: req }));
+    if (res && !req.schedule) {
+        watchDeployment(res.deploymentId, label || TASK_LABELS[req.type] || req.type);
+    }
+    return res;
+}
+
+/** Synchronisation forcée : instantanée si le terminal a son canal temps réel ouvert. */
+async function forceSync(t) {
+    const before = t.lastSeenAt;
+    const res = await guarded(() => api(`/terminals/${t.id}/sync`, { method: 'POST' }));
+    if (!res) return;
+    if (!res.delivered) {
+        notify(`Synchronisation — ${t.serialNumber}`,
+            `Terminal non joignable en temps réel : il se synchronisera à son prochain contact (≤ ${meta.pollIntervalSeconds} s).`, 'info');
+        return;
+    }
+    toast('Synchronisation demandée');
+    const started = Date.now();
+    const tick = async () => {
+        const cur = await api('/terminals/' + t.id).catch(() => null);
+        if (cur && cur.lastSeenAt && cur.lastSeenAt !== before) {
+            notify(`Terminal synchronisé — ${t.serialNumber}`, `Dernier contact ${fmtDate(cur.lastSeenAt)}`, 'ok');
+            refreshOpenDetail([t.id]);
+            if (currentView === 'terminals' && !$('#modal').open) views.terminals.render();
+            return;
+        }
+        if (Date.now() - started > 60000) {
+            notify(`Synchronisation — ${t.serialNumber}`, 'Pas de réponse du terminal après 60 s', 'err');
+            return;
+        }
+        setTimeout(tick, 2000);
+    };
+    setTimeout(tick, 1500);
+}
+
+// ------------------------------------------------------------------ Icônes
+
+const BRAND_COLORS = { NEWLAND: '#0b6fbf', PAX: '#d71e28', SUNMI: '#f08c00', OTHER: '#6a7280' };
+
+/** Pictogramme de TPE (écran + clavier) aux couleurs du constructeur, pastille verte si en ligne. */
+function terminalIcon(t) {
+    const c = BRAND_COLORS[t.manufacturer] || BRAND_COLORS.OTHER;
+    const keys = [0, 1, 2].map(r => [0, 1, 2].map(col =>
+        `<rect x="${5 + col * 6}" y="${19 + r * 4.3}" width="4" height="2.8" rx=".8" fill="#fff" opacity=".75"/>`).join('')).join('');
+    return `<svg class="term-ico ${t.online ? '' : 'off'}" viewBox="0 0 26 34">
+        <title>${esc(t.manufacturer)} ${esc(t.model || '')} — ${t.online ? 'en ligne' : 'hors ligne'}</title>
+        <rect x="1" y="1" width="24" height="32" rx="4" fill="${c}"/>
+        <rect x="4" y="4" width="18" height="12" rx="1.5" fill="#fff" opacity=".92"/>${keys}
+        ${t.online ? '<circle cx="21.5" cy="4.5" r="3" fill="#1a9d57" stroke="#fff" stroke-width="1"/>' : ''}
+    </svg>`;
+}
+
+/** Icône d'application : pastille à initiale, remplacée par la vraie icône dès qu'elle est chargée. */
+function appIcon(packageName, label) {
+    let h = 0;
+    for (const ch of packageName || '') h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    const letter = ((label || '').trim() || (packageName || '?').split('.').pop() || '?').charAt(0).toUpperCase();
+    return `<span class="app-icon" data-icon-pkg="${esc(packageName)}" style="background:hsl(${h % 360},55%,48%)">${esc(letter)}</span>`;
+}
+
+const iconCache = new Map(); // package → { url, at, promise }
+
+function iconUrl(pkg) {
+    const c = iconCache.get(pkg);
+    // Icône absente : nouvel essai après 1 min (l'agent l'envoie à son prochain heartbeat)
+    if (c && (c.url || c.promise || Date.now() - c.at < 60000)) return c.promise || Promise.resolve(c.url);
+    const promise = fetch(`${API}/apps/icons/${encodeURIComponent(pkg)}`, { headers: { Authorization: 'Basic ' + auth } })
+        .then(r => (r.ok ? r.blob() : null))
+        .then(b => (b ? URL.createObjectURL(b) : null))
+        .catch(() => null)
+        .then(url => { iconCache.set(pkg, { url, at: Date.now() }); return url; });
+    iconCache.set(pkg, { url: null, at: Date.now(), promise });
+    return promise;
+}
+
+function loadIcons(root) {
+    $$('[data-icon-pkg]:not([data-icon-done])', root).forEach(async el => {
+        el.dataset.iconDone = '1';
+        const url = await iconUrl(el.dataset.iconPkg);
+        if (url) {
+            el.classList.add('has-img');
+            el.innerHTML = `<img src="${url}" alt="">`;
+        }
+    });
+}
+
+// Toute icône insérée dans la page (vues, fiches, modales) est chargée automatiquement
+new MutationObserver(() => { if (auth) loadIcons(document); }).observe(document.body, { childList: true, subtree: true });
+
 // ------------------------------------------------------------------ Terminaux
 
 const terminalFilters = { manufacturer: '', status: '', organizationId: '', groupId: '', merchantId: '', q: '' };
@@ -298,6 +453,7 @@ views.terminals = {
         if (!list) return;
 
         const rows = list.map(t => `<tr class="clickable" data-id="${t.id}">
+            <td class="ico-cell">${terminalIcon(t)}</td>
             <td class="mono">${esc(t.serialNumber)}</td>
             <td><span class="badge">${esc(t.manufacturer)}</span></td>
             <td>${esc(t.model)}</td>
@@ -305,11 +461,12 @@ views.terminals = {
             <td>${esc(t.merchantName)}</td>
             <td>${esc(t.groupName)}</td>
             <td>${statusBadge(t.status)}</td>
-            <td><span class="dot ${t.online ? 'on' : ''}"></span>${t.online ? 'En ligne' : 'Hors ligne'}</td>
+            <td><span class="dot ${t.online ? 'on' : ''}"></span>${t.online ? 'En ligne' : 'Hors ligne'}${realtimeMark(t)}</td>
             <td>${esc(t.networkType) || '—'}</td>
             <td>${t.batteryLevel != null ? t.batteryLevel + ' %' : '—'}</td>
             <td>${t.deviceOwner ? '<span class="badge ok">DO</span>' : ''}</td>
-            <td>${fmtDate(t.lastSeenAt)}</td></tr>`);
+            <td>${fmtDate(t.lastSeenAt)}</td>
+            <td><button class="btn sm" data-sync="${t.id}" title="Forcer la synchronisation">⟳</button></td></tr>`);
 
         $('#view').innerHTML = `
             <form class="filters" id="termFilters">
@@ -321,14 +478,22 @@ views.terminals = {
                 <select name="merchantId">${options(r.merchants, terminalFilters.merchantId, { value: m => m.id, label: m => m.name, empty: 'Tous marchands' })}</select>
             </form>
             <p class="muted">${list.length} terminal(aux)</p>
-            ${table(['N° série', 'Constructeur', 'Modèle', 'Organisation', 'Marchand', 'Groupe', 'Statut', 'Connexion', 'Réseau', 'Batterie', '', 'Dernier contact'], rows, 'Aucun terminal. Installez TMS2M Agent ou pré-enregistrez un terminal.')}`;
+            ${table(['', 'N° série', 'Constructeur', 'Modèle', 'Organisation', 'Marchand', 'Groupe', 'Statut', 'Connexion', 'Réseau', 'Batterie', '', 'Dernier contact', ''], rows, 'Aucun terminal. Installez TMS2M Agent ou pré-enregistrez un terminal.')}`;
 
         const f = $('#termFilters');
         f.addEventListener('change', () => { Object.assign(terminalFilters, formData(f)); this.render(); });
         f.addEventListener('submit', e => { e.preventDefault(); Object.assign(terminalFilters, formData(f)); this.render(); });
         $$('tr[data-id]').forEach(tr => tr.addEventListener('click', () => terminalDetail(tr.dataset.id)));
+        $$('[data-sync]').forEach(b => b.addEventListener('click', e => {
+            e.stopPropagation(); // ne pas ouvrir la fiche
+            forceSync(list.find(t => String(t.id) === b.dataset.sync));
+        }));
     }
 };
+
+function realtimeMark(t) {
+    return t.realtime ? '<span class="rt" title="Canal temps réel ouvert : synchronisation et tâches instantanées">⚡</span>' : '';
+}
 
 async function terminalCreateModal() {
     const r = await guarded(refs);
@@ -414,7 +579,7 @@ async function terminalDetail(id, tab = 'supervision') {
         <div class="kv">
             <div><span>Modèle</span>${esc(t.model) || '—'}</div>
             <div><span>Statut</span>${statusBadge(t.status)}</div>
-            <div><span>Connexion</span><span class="dot ${t.online ? 'on' : ''}"></span>${t.online ? 'En ligne' : 'Hors ligne'} · ${esc(t.networkType) || '—'}</div>
+            <div><span>Connexion</span><span class="dot ${t.online ? 'on' : ''}"></span>${t.online ? 'En ligne' : 'Hors ligne'}${realtimeMark(t)} · ${esc(t.networkType) || '—'}</div>
             <div><span>Dernier contact</span>${fmtDate(t.lastSeenAt)}</div>
             <div><span>Android / firmware</span>${esc(t.osVersion) || '—'} · ${esc(t.firmwareVersion) || '—'}</div>
             <div><span>Agent</span>${esc(t.agentVersion) || '—'}</div>
@@ -439,13 +604,20 @@ async function terminalDetail(id, tab = 'supervision') {
                 { label: 'RAM disponible (Mo)', cls: 'alt', values: pts.filter(p => p.ramAvailBytes != null).map(p => ({ t: p.t, v: p.ramAvailBytes / 1048576 })) }], { unit: 'Mo' })}</div>
         </div>`;
 
-    const appRows = (t.installedApps || []).map(a => `<tr><td class="mono">${esc(a.packageName)}</td><td>${esc(a.versionName)}</td><td>${a.versionCode}</td></tr>`);
+    const labels = new Map(apps.map(a => [a.packageName, a.label]));
+    const appRows = (t.installedApps || []).slice().sort((a, b) => a.packageName.localeCompare(b.packageName)).map(a => `<tr>
+        <td class="ico-cell">${appIcon(a.packageName, labels.get(a.packageName))}</td>
+        <td>${esc(labels.get(a.packageName) || '')}<div class="mono muted">${esc(a.packageName)}</div></td>
+        <td>${esc(a.versionName)}</td><td>${a.versionCode}</td>
+        <td>${a.packageName === AGENT_PACKAGE ? '<span class="muted">agent TMS</span>'
+            : `<button class="btn sm danger" data-uninstall="${esc(a.packageName)}">Désinstaller</button>`}</td></tr>`);
     const taskRows = tasks.map(k => `<tr><td>${k.id}</td><td>${esc(TASK_LABELS[k.type] || k.type)}</td><td class="mono">${esc(k.payload.packageName || k.payload.path || '')}</td>
         <td>${statusBadge(k.status)}</td><td>${esc(k.message)}</td><td>${fmtDate(k.updatedAt)}</td><td>${taskResultButtons(k)}</td></tr>`);
     const histRows = history.map(h => `<tr><td>${fmtDate(h.occurredAt)}</td><td>${esc(AUDIT_LABELS[h.action] || h.action)}</td><td>${esc(h.actor)}</td><td>${esc(h.details)}</td></tr>`);
 
     const body = openModal(`${t.manufacturer} · ${t.serialNumber}`, `
         <div class="actions">
+            <button class="btn primary" id="actSync" title="Le terminal envoie immédiatement son état et récupère ses tâches">⟳ Synchroniser</button>
             <button class="btn" data-act="REBOOT">Redémarrer</button>
             <button class="btn" data-act="DIAGNOSE">Diagnostic</button>
             <button class="btn" data-act="EXTRACT_LOGS">Logs</button>
@@ -475,11 +647,12 @@ async function terminalDetail(id, tab = 'supervision') {
                 </div>
             </form>
         </div>
-        <div data-pane="apps">${table(['Package', 'Version', 'versionCode'], appRows, 'Inventaire non encore remonté')}</div>
+        <div data-pane="apps">${table(['', 'Application', 'Version', 'versionCode', ''], appRows, 'Inventaire non encore remonté')}</div>
         <div data-pane="tasks">${table(['#', 'Action', 'Cible', 'Statut', 'Message', 'Mis à jour', ''], taskRows, 'Aucune tâche')}</div>
         <div data-pane="history">${table(['Date', 'Événement', 'Par', 'Détails'], histRows, 'Aucun événement')}</div>`);
 
     const showTab = k => {
+        openDetail = { id: t.id, tab: k };
         $$('[data-tab]', body).forEach(b => b.classList.toggle('active', b.dataset.tab === k));
         $$('[data-pane]', body).forEach(p => p.classList.toggle('hidden', p.dataset.pane !== k));
     };
@@ -504,6 +677,17 @@ async function terminalDetail(id, tab = 'supervision') {
         } else {
             deployModal({ type, terminalIds: [Number(id)], apps });
         }
+    });
+    $('#actSync', body).onclick = () => forceSync(t);
+    $$('[data-uninstall]', body).forEach(b => b.onclick = async () => {
+        const pkg = b.dataset.uninstall;
+        const name = labels.get(pkg) || pkg;
+        if (!confirm(`Désinstaller ${name} (${pkg}) du terminal ${t.serialNumber} ?`
+            + (t.deviceOwner ? '' : '\n\nSans Device Owner, la désinstallation doit être confirmée sur l\'écran du terminal.'))) return;
+        b.disabled = true;
+        const res = await deployAndWatch({ type: 'UNINSTALL_APP', packageName: pkg, target: { terminalIds: [t.id] } },
+            `Désinstallation de ${name}`);
+        if (res) toast('Désinstallation demandée'); else b.disabled = false;
     });
     $('#actDelete', body).onclick = async () => {
         if (!confirm(`Supprimer définitivement le terminal ${t.serialNumber} et son historique ?`)) return;
@@ -562,21 +746,19 @@ function logsModal(t) {
         const d = formData(f);
         const range = d.since === 'range';
         if (range && !d.from) { toast('Indiquez le début de la plage', true); return; }
-        const res = await guarded(() => api('/deployments', {
-            method: 'POST', body: {
-                type: 'EXTRACT_LOGS', packageName: orNull(d.packageName), logLines: numOrNull(d.logLines),
-                logSinceMinutes: range ? null : numOrNull(d.since),
-                logFrom: range ? new Date(d.from).toISOString() : null,
-                logTo: range && d.to ? new Date(d.to).toISOString() : null,
-                target: { terminalIds: [t.id] }
-            }
-        }));
+        const res = await deployAndWatch({
+            type: 'EXTRACT_LOGS', packageName: orNull(d.packageName), logLines: numOrNull(d.logLines),
+            logSinceMinutes: range ? null : numOrNull(d.since),
+            logFrom: range ? new Date(d.from).toISOString() : null,
+            logTo: range && d.to ? new Date(d.to).toISOString() : null,
+            target: { terminalIds: [t.id] }
+        }, 'Extraction des logs');
         if (res) { toast('Extraction des logs demandée'); terminalDetail(t.id, 'tasks'); }
     });
 }
 
 async function quickDeploy(req, terminalId) {
-    const res = await guarded(() => api('/deployments', { method: 'POST', body: { ...req, target: { terminalIds: [Number(terminalId)] } } }));
+    const res = await deployAndWatch({ ...req, target: { terminalIds: [Number(terminalId)] } });
     if (res) { toast(`${TASK_LABELS[req.type]} : tâche créée`); terminalDetail(terminalId, 'tasks'); }
 }
 
@@ -680,7 +862,7 @@ async function deployModal({ type = 'INSTALL_APP', terminalIds = null, appId = n
             logSinceMinutes: d.type === 'EXTRACT_LOGS' ? numOrNull(d.logSince) : null,
             target, schedule
         };
-        const res = await guarded(() => api('/deployments', { method: 'POST', body: req }));
+        const res = await deployAndWatch(req);
         if (res) {
             closeModal();
             toast(`${res.taskCount} tâche(s) créée(s)` + (schedule ? ' (planifiées)' : ''));
@@ -697,7 +879,7 @@ views.apps = {
         const apps = await guarded(() => api('/apps'));
         if (!apps) return;
         const rows = apps.map(a => `<tr>
-            <td>${esc(a.label)}</td><td class="mono">${esc(a.packageName)}</td><td>${esc(a.versionName)}</td><td>${a.versionCode}</td>
+            <td class="ico-cell">${appIcon(a.packageName, a.label)}</td><td>${esc(a.label)}</td><td class="mono">${esc(a.packageName)}</td><td>${esc(a.versionName)}</td><td>${a.versionCode}</td>
             <td>${fmtBytes(a.sizeBytes)}</td><td class="mono" title="${esc(a.sha256)}">${esc(a.sha256.substring(0, 12))}…</td>
             <td>${fmtDate(a.uploadedAt)}</td>
             <td class="actions"><button class="btn sm" data-deploy="${a.id}">Déployer</button>
@@ -722,7 +904,7 @@ views.apps = {
                     <div class="actions"><button class="btn primary">Publier</button></div>
                 </form>
             </div>
-            ${table(['Nom', 'Package', 'Version', 'Code', 'Taille', 'SHA-256', 'Publié le', ''], rows, 'Aucun APK publié')}`;
+            ${table(['', 'Nom', 'Package', 'Version', 'Code', 'Taille', 'SHA-256', 'Publié le', ''], rows, 'Aucun APK publié')}`;
 
         $('#uploadForm').addEventListener('submit', async e => {
             e.preventDefault();

@@ -91,6 +91,8 @@ public final class Dtos {
         public String serverTime;
         public int pollIntervalSeconds;
         public List<DeviceTask> tasks;
+        /** Packages installés dont le serveur n'a pas encore l'icône. */
+        public List<String> iconsWanted;
     }
 
     public static class TaskStatusUpdate {

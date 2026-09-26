@@ -20,6 +20,7 @@ public class TaskService {
     /** Fichier compressé par l'agent (≈ 10x) : 200 000 lignes restent sous la limite de téléversement. */
     private static final int MAX_LOG_LINES = 200_000;
     private static final int DEFAULT_APP_LOG_LINES = 20_000;
+    private static final String AGENT_PACKAGE = "com.tms.agent";
 
     private final TaskRepository tasks;
     private final TerminalRepository terminals;
@@ -27,15 +28,18 @@ public class TaskService {
     private final OrganizationService organizations;
     private final AuditService audit;
     private final JsonSupport json;
+    private final SyncSignalService signals;
 
     public TaskService(TaskRepository tasks, TerminalRepository terminals, AppPackageRepository apps,
-                       OrganizationService organizations, AuditService audit, JsonSupport json) {
+                       OrganizationService organizations, AuditService audit, JsonSupport json,
+                       SyncSignalService signals) {
         this.tasks = tasks;
         this.terminals = terminals;
         this.apps = apps;
         this.organizations = organizations;
         this.audit = audit;
         this.json = json;
+        this.signals = signals;
     }
 
     @Transactional
@@ -72,6 +76,8 @@ public class TaskService {
             return task;
         }).toList();
         tasks.saveAll(created);
+        // Temps réel : les terminaux connectés récupèrent leurs tâches immédiatement
+        signals.signalAfterCommit(targets.stream().map(Terminal::getId).toList());
         return created.size();
     }
 
@@ -134,7 +140,14 @@ public class TaskService {
                         .orElseThrow(() -> ApiException.notFound("Application", req.appId()));
                 payload.putAll(installPayload(app));
             }
-            case UNINSTALL_APP, PUSH_PARAMS -> payload.put("packageName", requiredPackage(req));
+            case UNINSTALL_APP -> {
+                String pkg = requiredPackage(req);
+                if (pkg.equals(AGENT_PACKAGE)) {
+                    throw ApiException.badRequest("L'agent TMS ne peut pas être désinstallé à distance");
+                }
+                payload.put("packageName", pkg);
+            }
+            case PUSH_PARAMS -> payload.put("packageName", requiredPackage(req));
             case SET_AUTORUN -> payload.put("packageName", req.packageName() == null ? "" : req.packageName().trim());
             case SET_KIOSK -> payload.put("packages", req.kioskPackages() == null ? List.of()
                     : req.kioskPackages().stream().map(String::trim).filter(s -> !s.isEmpty()).distinct().toList());

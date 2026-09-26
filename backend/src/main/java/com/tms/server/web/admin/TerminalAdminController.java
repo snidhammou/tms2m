@@ -73,6 +73,12 @@ public class TerminalAdminController {
         return parameters.resolve(id, packageName);
     }
 
+    /** Synchronisation forcée : instantanée si le terminal est connecté au canal temps réel. */
+    @PostMapping("/{id}/sync")
+    public SyncResponse sync(@PathVariable Long id) {
+        return terminals.forceSync(id);
+    }
+
     /** Points de supervision (batterie, stockage, RAM, trafic réseau) sur les dernières heures. */
     @GetMapping("/{id}/metrics")
     public List<MetricPointDto> metrics(@PathVariable Long id, @RequestParam(defaultValue = "24") int hours) {

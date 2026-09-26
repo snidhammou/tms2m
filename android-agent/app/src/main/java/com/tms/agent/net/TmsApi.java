@@ -1,6 +1,9 @@
 package com.tms.agent.net;
 
+import java.util.Map;
+
 import okhttp3.MultipartBody;
+import okhttp3.RequestBody;
 import okhttp3.ResponseBody;
 import retrofit2.Call;
 import retrofit2.http.Body;
@@ -28,6 +31,17 @@ public interface TmsApi {
     @Multipart
     @POST("api/device/v1/tasks/{id}/artifact")
     Call<Void> uploadArtifact(@Path("id") long taskId, @Part MultipartBody.Part file);
+
+    /**
+     * Canal temps réel (long polling) : répond {"sync":true} dès que le serveur demande une
+     * synchronisation (tâche créée, synchro forcée depuis la console), sinon {"sync":false} au bout du délai.
+     */
+    @GET("api/device/v1/wait")
+    Call<Map<String, Object>> waitForSync(@Query("timeout") int timeoutSeconds);
+
+    /** Icône PNG d'une application installée, réclamée par le serveur (iconsWanted). */
+    @POST("api/device/v1/icons/{packageName}")
+    Call<ResponseBody> uploadIcon(@Path("packageName") String packageName, @Body RequestBody png);
 
     @GET("api/device/v1/parameters")
     Call<Dtos.ParametersResponse> parameters(@Query("packageName") String packageName);

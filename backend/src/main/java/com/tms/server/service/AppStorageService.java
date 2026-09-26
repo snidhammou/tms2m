@@ -9,6 +9,8 @@ import net.dongliu.apk.parser.ApkFile;
 import net.dongliu.apk.parser.bean.ApkMeta;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
@@ -34,9 +36,11 @@ public class AppStorageService {
 
     private final AppPackageRepository repo;
     private final Path storageDir;
+    private final IconService icons;
 
-    public AppStorageService(AppPackageRepository repo, TmsProperties props) {
+    public AppStorageService(AppPackageRepository repo, TmsProperties props, IconService icons) {
         this.repo = repo;
+        this.icons = icons;
         this.storageDir = Path.of(props.storage().apkDir()).toAbsolutePath().normalize();
         try {
             Files.createDirectories(storageDir);
@@ -94,6 +98,7 @@ public class AppStorageService {
             String storedName = packageName + "-" + versionCode + "-" + sha256.substring(0, 8) + ".apk";
             Files.move(tmp, storageDir.resolve(storedName), StandardCopyOption.REPLACE_EXISTING);
             tmp = null;
+            icons.extractFromApk(packageName, storageDir.resolve(storedName));
 
             AppPackage app = new AppPackage();
             app.setPackageName(packageName);
@@ -125,6 +130,18 @@ public class AppStorageService {
             throw ApiException.notFound("Fichier APK", app.getStoredFileName());
         }
         return new FileSystemResource(path);
+    }
+
+    /** Rattrapage au démarrage : icônes des APK stockés avant l'ajout de cette fonctionnalité. */
+    @EventListener(ApplicationReadyEvent.class)
+    @Transactional(readOnly = true)
+    public void backfillIcons() {
+        repo.findAll().forEach(app -> {
+            Path apk = storageDir.resolve(app.getStoredFileName());
+            if (icons.find(app.getPackageName()).isEmpty() && Files.exists(apk)) {
+                icons.extractFromApk(app.getPackageName(), apk);
+            }
+        });
     }
 
     @Transactional

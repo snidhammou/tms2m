@@ -27,7 +27,12 @@ public final class AdminDtos {
             Long storageTotalBytes, Long storageFreeBytes, Long ramTotalBytes, Long ramAvailBytes,
             String networkType, Long uptimeSeconds, Boolean deviceOwner,
             String autoRunPackage, List<String> kioskPackages,
-            List<DeviceDtos.InstalledApp> installedApps) {
+            List<DeviceDtos.InstalledApp> installedApps,
+            /* canal temps réel ouvert : synchronisation et tâches instantanées */ boolean realtime) {
+    }
+
+    /** Résultat d'une synchronisation forcée ; {@code delivered} = terminal joint instantanément. */
+    public record SyncResponse(boolean delivered, Instant requestedAt) {
     }
 
     public record TerminalCreateRequest(

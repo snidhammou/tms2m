@@ -65,9 +65,14 @@ public class TaskExecutor {
                 case "INSTALL_APP":
                     result = install(task);
                     break;
-                case "UNINSTALL_APP":
-                    result = device.uninstall(required(task, "packageName"));
+                case "UNINSTALL_APP": {
+                    String pkg = required(task, "packageName");
+                    // L'agent ne se désinstalle pas lui-même : le terminal serait perdu pour le TMS
+                    result = pkg.equals(context.getPackageName())
+                            ? OpResult.fail("Désinstallation de l'agent TMS refusée")
+                            : device.uninstall(pkg);
                     break;
+                }
                 case "PUSH_PARAMS":
                     result = pushParameters(required(task, "packageName"));
                     break;

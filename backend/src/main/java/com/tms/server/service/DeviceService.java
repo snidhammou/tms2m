@@ -42,9 +42,12 @@ public class DeviceService {
     private final JsonSupport json;
     private final TmsProperties props;
     private final Path artifactDir;
+    private final IconService icons;
 
     public DeviceService(TerminalRepository terminals, TaskRepository tasks, TerminalMetricRepository metrics,
-                         ParameterService parameters, AuditService audit, JsonSupport json, TmsProperties props) {
+                         ParameterService parameters, AuditService audit, JsonSupport json, TmsProperties props,
+                         IconService icons) {
+        this.icons = icons;
         this.terminals = terminals;
         this.tasks = tasks;
         this.metrics = metrics;
@@ -103,7 +106,9 @@ public class DeviceService {
                 .map(task -> new DeviceTask(task.getId(), task.getType(), json.readMap(task.getPayloadJson())))
                 .toList();
 
-        return new HeartbeatResponse(now, props.device().pollIntervalSeconds(), pending);
+        List<String> iconsWanted = req.installedApps() == null ? List.of()
+                : icons.missing(req.installedApps().stream().map(InstalledApp::packageName).toList());
+        return new HeartbeatResponse(now, props.device().pollIntervalSeconds(), pending, iconsWanted);
     }
 
     @Transactional

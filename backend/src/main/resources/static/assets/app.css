@@ -172,3 +172,38 @@ pre.report { background: var(--surface-2); padding: 12px; border-radius: 6px; ov
 }
 .toast.show { opacity: 1; transform: none; }
 .toast.err { background: var(--danger); color: #fff; }
+
+/* Notifications de fin de tâche (en bas à gauche) */
+.notifs {
+    position: fixed; left: 20px; bottom: 20px; z-index: 1000; display: flex; flex-direction: column-reverse;
+    gap: 8px; max-width: 380px; width: calc(100vw - 40px); pointer-events: none;
+}
+.notif {
+    pointer-events: auto; display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px;
+    background: var(--surface); color: var(--text); border: 1px solid var(--border);
+    border-left: 4px solid var(--muted); border-radius: 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, .18);
+    animation: notif-in .2s ease-out;
+}
+.notif.ok { border-left-color: #1a9d57; }
+.notif.err { border-left-color: var(--danger); }
+.notif.info { border-left-color: #2f6fdf; }
+.notif .ico { font-size: 18px; line-height: 1.2; }
+.notif .txt { flex: 1; min-width: 0; }
+.notif .txt b { display: block; margin-bottom: 2px; }
+.notif .txt div { font-size: 13px; opacity: .85; overflow-wrap: anywhere; }
+.notif .close { background: none; border: 0; color: inherit; cursor: pointer; opacity: .6; font-size: 14px; }
+.notif .close:hover { opacity: 1; }
+.notif.leaving { opacity: 0; transform: translateX(-12px); transition: all .25s; }
+@keyframes notif-in { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
+
+/* Icônes terminaux / applications */
+.term-ico { width: 26px; height: 34px; display: block; }
+.term-ico.off { opacity: .45; }
+.app-icon {
+    width: 32px; height: 32px; border-radius: 7px; display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 14px; color: #fff; overflow: hidden; vertical-align: middle; flex: none;
+}
+.app-icon img { width: 100%; height: 100%; object-fit: contain; }
+.app-icon.has-img { background: transparent !important; }
+td.ico-cell { width: 40px; padding-right: 0; }
+.rt { font-size: 11px; margin-left: 4px; color: #1a9d57; }

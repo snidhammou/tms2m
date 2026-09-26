@@ -2,8 +2,11 @@ package com.tms.server.web.admin;
 
 import com.tms.server.domain.AppPackage;
 import com.tms.server.service.AppStorageService;
+import com.tms.server.service.IconService;
 import com.tms.server.web.dto.AdminDtos.AppPackageDto;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -11,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.Duration;
 import java.util.List;
 
 @RestController
@@ -18,8 +22,10 @@ import java.util.List;
 public class AppAdminController {
 
     private final AppStorageService apps;
+    private final IconService icons;
 
-    public AppAdminController(AppStorageService apps) {
+    public AppAdminController(AppStorageService apps, IconService icons) {
+        this.icons = icons;
         this.apps = apps;
     }
 
@@ -45,6 +51,17 @@ public class AppAdminController {
                 .contentType(MediaType.parseMediaType("application/vnd.android.package-archive"))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + app.getStoredFileName() + "\"")
                 .body(apps.file(app));
+    }
+
+    /** Icône d'une application par package (dépôt ou remontée par un terminal) ; 404 si inconnue. */
+    @GetMapping("/icons/{packageName:.+}")
+    public ResponseEntity<Resource> icon(@PathVariable String packageName) {
+        return icons.find(packageName)
+                .map(p -> ResponseEntity.ok()
+                        .contentType(MediaType.IMAGE_PNG)
+                        .cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePrivate())
+                        .<Resource>body(new FileSystemResource(p)))
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/{id}")
