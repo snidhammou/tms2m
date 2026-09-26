@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Politiques d'administration de TMS2M Agent. Le redémarrage et l'installation silencieuse
+     découlent du statut Device Owner lui-même : aucune politique supplémentaire n'est requise. -->
+<device-admin>
+    <uses-policies />
+</device-admin>

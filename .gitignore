@@ -12,6 +12,11 @@ local.properties
 .vscode/
 captures/
 
+# --- Signature : informations de keystore locales ---
+android-agent/keystore.properties
+*.jks
+*.keystore
+
 # --- Backend : base H2 de dev et APK uploadés ---
 backend/data/
 

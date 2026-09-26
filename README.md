@@ -63,11 +63,23 @@ L'URL et la clé sont intégrées à l'APK (staging de masse sans saisie). Elles
 | Variante | Tâche Gradle | Contenu |
 |---|---|---|
 | `universal` | `assembleUniversalDebug` / `Release` | API Android standard, pour tout terminal |
-| `newland` | `assembleNewlandDebug` / `Release` | + MESDK Newland (`app/libs/newland/`) : reboot via `NDK_SysReboot`, n° de série et firmware officiels |
+| `newland` | `assembleNewlandDebug` / `Release` | + MESDK Newland (`app/libs/newland/`) : n° de série et firmware officiels (le MESDK ne redémarre pas Android : `NDK_SysReboot` ne redémarre que le processeur sécurisé K21, et n'est donc pas utilisé) |
 | `pax` | `assemblePaxDebug` / `Release` | + NeptuneLite PAX (`app/libs/pax/`) : installation / désinstallation silencieuses, reboot, n° de série / modèle / firmware |
 | `sunmi` | `assembleSunmiDebug` / `Release` | + PayLib Sunmi (`app/libs/sunmi/`) : reboot via `sysPowerManage`, n° de série / modèle officiels |
 
-Le MESDK Newland et PayLib Sunmi **ne fournissent pas d'API d'installation d'APK**. Pour installer en silence sur ces marques, l'agent doit être signé avec la clé système du constructeur.
+Le MESDK Newland et PayLib Sunmi **ne fournissent pas d'API d'installation d'APK**. Pour installer en silence sur ces marques, l'agent doit être signé avec la clé système du constructeur. Il en va de même pour le **reboot sur Newland**.
+
+### Mode Device Owner (reboot et installations silencieuses sans signature constructeur)
+
+TMS2M Agent peut être défini comme **Device Owner** (propriétaire de l'appareil). Android lui ouvre alors `DevicePolicyManager.reboot()` et l'installation / désinstallation silencieuses, sur **toutes les marques** (Android 7+), sans signature plateforme. C'est la solution pour le reboot sur Newland et pour l'installation silencieuse sur Newland et Sunmi.
+
+Activation, une fois par terminal, sur un terminal **sans compte** configuré :
+```bash
+adb shell dpm set-device-owner com.tms.agent/.admin.AgentDeviceAdmin
+```
+- L'écran de l'agent affiche « Device Owner : oui ». Le bouton « Retirer Device Owner » permet de le retirer en développement.
+- Un agent Device Owner **ne peut pas être désinstallé** tant que ce statut est actif. Les mises à jour doivent être signées avec la même clé.
+- En production, l'activation se fait au déploiement : adb en atelier, ou provisioning par QR code après réinitialisation.
 
 Chaque variante embarque le SDK de sa marque et, pour les autres constructeurs, l'implémentation sans SDK de `src/stubs/<marque>`. Quelle que soit la marque, l'agent ne déclare une installation réussie qu'après avoir vérifié la version réellement installée, et un reboot qu'après avoir constaté que le terminal a redémarré.
 
@@ -77,6 +89,12 @@ gradlew assembleNewlandDebug -PtmsServerUrl=http://127.0.0.1:8095
 powershell -ExecutionPolicy Bypass -File tools\install-agent.ps1      # installe uniquement sur les terminaux Newland branchés
 powershell -ExecutionPolicy Bypass -File tools\usb-tunnel.ps1         # rétablit adb reverse à chaque reconnexion USB
 ```
+**Tester en Wi-Fi local** (terminal et PC sur le même réseau) : compilez avec `-PtmsServerUrl=http://<IP-du-PC>:8095`, ou saisissez cette URL dans l'écran de l'agent. Le port 8095 doit être ouvert dans le pare-feu Windows pour le sous-réseau local :
+```bash
+New-NetFirewallRule -DisplayName "TMS2M 8095 (LAN)" -Direction Inbound -Protocol TCP -LocalPort 8095 -RemoteAddress LocalSubnet -Action Allow
+```
+En HTTP clair, c'est à réserver aux tests. En production, il faut un serveur HTTPS.
+
 Les deux scripts ne ciblent que le constructeur demandé (`-Manufacturer`, `newland` par défaut) : un téléphone branché en même temps est ignoré.
 
 > Sous Windows, placez le projet dans un chemin court (ex. `C:\dev\tms`) : `aidl.exe` échoue au-delà de 260 caractères.
@@ -115,6 +133,17 @@ Sur Android 11+, l'application cliente doit déclarer `<queries><package android
 
 **Admin** (`/api/admin/v1`, HTTP Basic)
 `/dashboard` · `/meta` · `/terminals[/{id}[/parameters]]` · `/merchants` · `/groups` · `/apps` · `/parameters` · `/tasks[/{id}/cancel]` · `POST /deployments`
+
+## Points ouverts (rappels)
+
+- [ ] **Sunmi P3 de test (SN `P365P54QJ0423`) : réinitialisation usine à faire**, pour passer TMS2M Agent en Device Owner et débloquer l'installation silencieuse.
+  - Le Device Owner actuel est un prototype S2M (`com.ma.s2m.nxp.tms.tmsapp`, signé avec la clé debug du PC d'un autre développeur, SHA-256 `a55c7a86…5ebff6`). Il ne sait pas rendre son statut, et ce statut ne se retire pas par adb.
+  - Alternative sans effacement : récupérer le `debug.keystore` de son développeur, puis publier une mise à jour qui appelle `clearDeviceOwnerApp()`.
+  - Avant : vérifier qu'aucune donnée ni clé de paiement utile n'est sur le terminal.
+  - Après : Wi-Fi sans aucun compte, débogage USB, puis `tools/install-agent.ps1 -Manufacturer sunmi` et `adb shell dpm set-device-owner com.tms.agent/.admin.AgentDeviceAdmin`.
+- [ ] **Newland** : demander la signature plateforme de TMS2M Agent (alternative au Device Owner, déjà actif sur le N950S de test).
+- [ ] **PAX / Newland production** : faire signer TMS2M Agent par le constructeur (outil PAX / Certificate Management Newland).
+- [ ] Désinstaller l'agent du téléphone Samsung (`RFCR60L95ZF`) installé par erreur lors des tests.
 
 ## Pistes pour la production
 - mTLS ou attestation constructeur à l'enrôlement (aujourd'hui : la clé partagée + le numéro de série suffisent) ;

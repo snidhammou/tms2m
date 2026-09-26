@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.format.DateFormat;
+import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -18,6 +19,7 @@ import androidx.core.app.ActivityCompat;
 import com.tms.agent.AgentApp;
 import com.tms.agent.BuildConfig;
 import com.tms.agent.R;
+import com.tms.agent.admin.AgentDeviceAdmin;
 import com.tms.agent.config.AgentConfig;
 import com.tms.agent.core.AgentService;
 import com.tms.agent.device.DeviceManager;
@@ -38,6 +40,7 @@ public class MainActivity extends AppCompatActivity {
     private EditText serverUrl;
     private EditText enrollmentKey;
     private TextView status;
+    private Button clearOwner;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -76,6 +79,17 @@ public class MainActivity extends AppCompatActivity {
                 .setNegativeButton(android.R.string.cancel, null)
                 .show());
 
+        clearOwner = findViewById(R.id.clearOwnerButton);
+        clearOwner.setOnClickListener(v -> new AlertDialog.Builder(this)
+                .setTitle(R.string.clear_owner_title)
+                .setMessage(R.string.clear_owner_message)
+                .setPositiveButton(android.R.string.ok, (d, w) -> {
+                    AgentDeviceAdmin.clearDeviceOwner(this);
+                    refreshStatus();
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show());
+
         if (Build.VERSION.SDK_INT >= 33) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1);
         }
@@ -105,8 +119,11 @@ public class MainActivity extends AppCompatActivity {
         String enrolled = config.isEnrolled()
                 ? getString(R.string.enrolled_as, config.getTerminalId())
                 : getString(R.string.not_enrolled);
+        boolean owner = AgentDeviceAdmin.isDeviceOwner(this);
         status.setText(getString(R.string.status_text, enrolled, lastSync,
-                config.getPollIntervalSeconds(), config.getLastStatus()));
+                config.getPollIntervalSeconds(), config.getLastStatus(),
+                getString(owner ? R.string.device_owner_yes : R.string.device_owner_no)));
+        clearOwner.setVisibility(owner ? View.VISIBLE : View.GONE);
     }
 
     @Override

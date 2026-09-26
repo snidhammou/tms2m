@@ -2,12 +2,15 @@ package com.tms.agent.device;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.admin.DevicePolicyManager;
 import android.content.Context;
 import android.content.pm.PackageInstaller;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.PowerManager;
 import android.provider.Settings;
+
+import com.tms.agent.admin.AgentDeviceAdmin;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -137,17 +140,30 @@ public class GenericDeviceManager implements DeviceManager {
 
     @Override
     public boolean canReboot() {
-        return context.checkCallingOrSelfPermission(Manifest.permission.REBOOT) == PackageManager.PERMISSION_GRANTED;
+        return AgentDeviceAdmin.canRebootAsOwner(context)
+                || context.checkCallingOrSelfPermission(Manifest.permission.REBOOT) == PackageManager.PERMISSION_GRANTED;
     }
 
     @Override
     public OpResult reboot() {
+        // 1. Device Owner : API officielle, sans signature constructeur (Android 7+)
+        if (AgentDeviceAdmin.canRebootAsOwner(context)) {
+            try {
+                DevicePolicyManager dpm = (DevicePolicyManager) context.getSystemService(Context.DEVICE_POLICY_SERVICE);
+                dpm.reboot(AgentDeviceAdmin.component(context));
+                return OpResult.ok("Redémarrage (Device Owner)");
+            } catch (RuntimeException e) {
+                // IllegalStateException : appel téléphonique en cours
+                return OpResult.fail("Redémarrage Device Owner refusé : " + e.getMessage());
+            }
+        }
+        // 2. Agent signé avec la clé plateforme du constructeur
         try {
             PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
             pm.reboot(null);
             return OpResult.ok("Redémarrage");
         } catch (SecurityException e) {
-            return OpResult.fail("Permission REBOOT absente (agent non signé plateforme)");
+            return OpResult.fail("Permission REBOOT absente (agent ni Device Owner, ni signé plateforme)");
         }
     }
 

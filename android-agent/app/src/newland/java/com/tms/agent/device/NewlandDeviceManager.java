@@ -3,7 +3,6 @@ package com.tms.agent.device;
 import android.content.Context;
 import android.util.Log;
 
-import com.newland.ndk.NdkApiManager;
 import com.newland.sdk.ModuleManage;
 import com.newland.sdk.module.devicebasic.DeviceBasicModule;
 import com.newland.sdk.module.devicebasic.DeviceInfo;
@@ -12,10 +11,13 @@ import com.newland.sdk.module.devicebasic.DeviceInfo;
  * Terminaux Newland (N910, N950, N950S, X800…) : implémentation s'appuyant sur le MESDK.
  *
  * <ul>
- *   <li>Reboot : {@code NdkApiManager.getSysN().NDK_SysReboot()} (ne requiert pas la clé plateforme).</li>
  *   <li>N° de série et firmware : {@code DeviceBasicModule.getDeviceInfo()}.</li>
- *   <li>Installation / désinstallation : le MESDK n'expose pas d'API d'installation d'APK ;
- *       on utilise PackageInstaller (silencieux si l'agent est signé avec la clé système Newland).</li>
+ *   <li>Reboot : le MESDK n'expose pas de redémarrage d'Android. {@code SysN.NDK_SysReboot()}
+ *       redémarre le processeur sécurisé K21 (log "executed from K21"), pas Android, et peut
+ *       interrompre une transaction : il n'est volontairement PAS utilisé. Le reboot Android
+ *       passe par l'implémentation générique : agent Device Owner, ou signé avec la clé système Newland.</li>
+ *   <li>Installation / désinstallation : pas d'API d'installation d'APK dans le MESDK ;
+ *       PackageInstaller est utilisé (silencieux si l'agent est signé avec la clé système Newland).</li>
  * </ul>
  * Toute erreur SDK (librairie native absente, permission MANAGE_NEWLAND refusée…) fait
  * retomber sur le comportement Android standard.
@@ -88,24 +90,5 @@ public class NewlandDeviceManager extends GenericDeviceManager {
         return cachedFirmware;
     }
 
-    @Override
-    public boolean canReboot() {
-        return sdk() || super.canReboot();
-    }
-
-    @Override
-    public OpResult reboot() {
-        if (sdk()) {
-            try {
-                int ret = NdkApiManager.getNdkApiManager().getSysN().NDK_SysReboot();
-                if (ret == 0) {
-                    return OpResult.ok("Redémarrage (MESDK)");
-                }
-                Log.w(TAG, "NDK_SysReboot a retourné " + ret + ", tentative Android standard");
-            } catch (Throwable t) {
-                Log.w(TAG, "NDK_SysReboot en échec, tentative Android standard", t);
-            }
-        }
-        return super.reboot();
-    }
+    // canReboot() / reboot() : implémentation générique (Device Owner, ou permission REBOOT si signé système Newland).
 }

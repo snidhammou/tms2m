@@ -18,10 +18,17 @@
     <string name="reset_title">Ré-enrôler le terminal ?</string>
     <string name="reset_message">Le jeton actuel sera oublié et un nouvel enrôlement sera effectué auprès du serveur.</string>
 
-    <string name="status_text">%1$s\nDernière synchro : %2$s\nIntervalle : %3$d s\n\n%4$s</string>
+    <string name="status_text">%1$s\n%5$s\nDernière synchro : %2$s\nIntervalle : %3$d s\n\n%4$s</string>
     <string name="enrolled_as">Enrôlé — terminal #%1$d</string>
     <string name="not_enrolled">Non enrôlé</string>
     <string name="never">jamais</string>
+
+    <string name="admin_description">Permet à TMS2M Agent de redémarrer le terminal et d\'installer les applications à distance.</string>
+    <string name="device_owner_yes">Device Owner : oui (reboot et installations silencieux)</string>
+    <string name="device_owner_no">Device Owner : non</string>
+    <string name="clear_owner">Retirer Device Owner</string>
+    <string name="clear_owner_title">Retirer le statut Device Owner ?</string>
+    <string name="clear_owner_message">L\'agent ne pourra plus redémarrer le terminal ni installer d\'applications en silence. Pour le rétablir : adb shell dpm set-device-owner com.tms.agent/.admin.AgentDeviceAdmin</string>
 
     <string name="saved">Configuration enregistrée</string>
     <string name="sync_requested">Synchronisation demandée</string>

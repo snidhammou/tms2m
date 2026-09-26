@@ -2,12 +2,35 @@ plugins {
     id("com.android.application")
 }
 
+import java.util.Properties
+
 val tmsServerUrl: String = (project.findProperty("tmsServerUrl") as String?) ?: "http://10.0.2.2:8095"
 val tmsEnrollmentKey: String = (project.findProperty("tmsEnrollmentKey") as String?) ?: ""
+
+// Signature S2M : lue depuis android-agent/keystore.properties (local, jamais versionné).
+// Modèle : keystore.properties.example. Sans ce fichier, la clé debug Android est utilisée.
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
 
 android {
     namespace = "com.tms.agent"
     compileSdk = 34
+
+    signingConfigs {
+        if (keystoreProps.getProperty("storeFile") != null) {
+            create("s2m") {
+                storeFile = file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+                // v1 + v2 : comme les APK S2M passés ensuite dans Certificate Management (Newland)
+                enableV1Signing = true
+                enableV2Signing = true
+            }
+        }
+    }
 
     defaultConfig {
         applicationId = "com.tms.agent"
@@ -60,8 +83,10 @@ android {
     buildTypes {
         debug {
             manifestPlaceholders["cleartext"] = "true"
+            signingConfigs.findByName("s2m")?.let { signingConfig = it }
         }
         release {
+            signingConfigs.findByName("s2m")?.let { signingConfig = it }
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // HTTPS obligatoire en production

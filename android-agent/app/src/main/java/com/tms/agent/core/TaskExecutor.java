@@ -221,7 +221,8 @@ public class TaskExecutor {
 
     private void reboot(Dtos.DeviceTask task) {
         if (!device.canReboot()) {
-            report(task.id, "FAILED", "Reboot non autorisé : agent non signé avec la clé plateforme " + device.vendor());
+            report(task.id, "FAILED", "Reboot non autorisé : agent ni Device Owner, ni signé avec la clé plateforme "
+                    + device.vendor());
             return;
         }
         // Le succès sera confirmé au redémarrage de l'agent (SyncEngine) si l'heure de boot a changé :
