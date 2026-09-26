@@ -25,7 +25,7 @@ const AUDIT_LABELS = {
     TASK_CANCELLED: 'Tâche annulée', TERMINAL_REGISTERED: 'Pré-enregistrement', BULK_REGISTER: 'Pré-enregistrement par lots',
     TERMINAL_STATUS: 'Changement de statut', TERMINAL_GROUP: 'Changement de groupe', TERMINAL_DELETED: 'Terminal supprimé',
     PARAMETERS_SAVED: 'Paramètres enregistrés', PARAM_TEMPLATE_APPLIED: 'Modèle de paramètres appliqué',
-    GROUP_TEMPLATE: 'Modèle de groupe', FORCE_SYNC: 'Synchronisation forcée'
+    GROUP_TEMPLATE: 'Modèle de groupe', FORCE_SYNC: 'Synchronisation forcée', AGENT_AUTO_UPDATE: 'Mise à jour auto de l\'agent'
 };
 
 // ------------------------------------------------------------------ utils
@@ -886,12 +886,31 @@ views.apps = {
                 <button class="btn sm" data-dl="${a.id}">Télécharger</button>
                 <button class="btn sm danger" data-del="${a.id}">Supprimer</button></td></tr>`);
 
-        $('#view').innerHTML = `
+        // Dernière version publiée de l'agent, par variante constructeur (suffixe du versionName)
+        const variantOf = v => (v || '').split('-')[1] || 'universal';
+        const agentLatest = {};
+        apps.filter(a => a.packageName === AGENT_PACKAGE).forEach(a => {
+            const v = variantOf(a.versionName);
+            if (!agentLatest[v] || a.versionCode > agentLatest[v].versionCode) agentLatest[v] = a;
+        });
+        const agentCard = `<div class="card" style="margin-bottom:16px">
+            <h3>TMS2M Agent — mise à jour automatique
+                ${meta.agentAutoUpdate ? '<span class="badge ok">activée</span>' : '<span class="badge">désactivée</span>'}</h3>
+            <p class="muted">Publiez ci-dessous les APK d'une nouvelle version de l'agent (<span class="mono">tools\build-agent-release.ps1 -Version X.Y.Z</span>) :
+                chaque terminal installe automatiquement la version de sa variante à sa prochaine synchronisation.
+                Installation silencieuse en Device Owner ou via le SDK PAX ; sinon, confirmation sur l'écran du terminal.
+                ${meta.agentAutoUpdate ? '' : 'Pour l\'activer : TMS_AGENT_AUTO_UPDATE=true dans deploy/.env.'}</p>
+            <div class="kv">${['newland', 'pax', 'sunmi', 'universal'].map(v =>
+                `<div><span>Dernière version ${v}</span>${agentLatest[v]
+                    ? esc(agentLatest[v].versionName) + ` <span class="muted">(${agentLatest[v].versionCode})</span>` : '—'}</div>`).join('')}</div>
+        </div>`;
+
+        $('#view').innerHTML = agentCard + `
             <div class="card" style="margin-bottom:16px">
                 <h3>Publier un APK</h3>
                 <form class="form" id="uploadForm">
                     <div class="form-row">
-                        <label>Fichier APK *<input type="file" name="file" accept=".apk" required></label>
+                        <label>Fichier(s) APK *<input type="file" name="file" accept=".apk" multiple required></label>
                         <label>Description<input name="description"></label>
                     </div>
                     <p class="muted">packageName et version sont lus dans le manifeste de l'APK, qui fait toujours foi.
@@ -908,10 +927,22 @@ views.apps = {
 
         $('#uploadForm').addEventListener('submit', async e => {
             e.preventDefault();
-            const fd = new FormData(e.target);
-            for (const k of ['packageName', 'versionName', 'versionCode', 'description']) if (!fd.get(k)) fd.delete(k);
-            const res = await guarded(() => api('/apps', { method: 'POST', body: fd }));
-            if (res) { toast(`${res.packageName} ${res.versionName || ''} publié`); this.render(); }
+            const files = [...e.target.file.files];
+            const btn = e.submitter; if (btn) btn.disabled = true;
+            // Un envoi par fichier (ex. les 4 variantes de l'agent) : un échec n'empêche pas les autres
+            for (const file of files) {
+                const fd = new FormData(e.target);
+                fd.set('file', file);
+                for (const k of ['packageName', 'versionName', 'versionCode', 'description']) if (!fd.get(k)) fd.delete(k);
+                try {
+                    const res = await api('/apps', { method: 'POST', body: fd });
+                    notify(`${res.label || res.packageName} ${res.versionName || ''} publié`,
+                        res.packageName === AGENT_PACKAGE && meta.agentAutoUpdate ? 'Les terminaux de cette variante vont se mettre à jour automatiquement' : file.name, 'ok');
+                } catch (err) {
+                    notify(`Échec de publication — ${file.name}`, err.message, 'err');
+                }
+            }
+            this.render();
         });
         $$('[data-deploy]').forEach(b => b.onclick = () => deployModal({ type: 'INSTALL_APP', appId: b.dataset.deploy, apps }));
         $$('[data-del]').forEach(b => b.onclick = async () => {

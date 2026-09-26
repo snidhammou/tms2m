@@ -27,6 +27,8 @@ tms:
     auto-accept: ${TMS_AUTO_ACCEPT:true}
   device:
     poll-interval-seconds: ${TMS_POLL_INTERVAL:60}
+    # Mise à jour automatique de TMS2M Agent dès qu'une version plus récente est publiée
+    agent-auto-update: ${TMS_AGENT_AUTO_UPDATE:true}
   storage:
     apk-dir: ${TMS_APK_DIR:./data/apks}
     # Logs et fichiers extraits des terminaux

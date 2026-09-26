@@ -34,6 +34,7 @@ services:
       TMS_ENROLLMENT_KEY: ${TMS_ENROLLMENT_KEY:?TMS_ENROLLMENT_KEY manquant}
       TMS_AUTO_ACCEPT: ${TMS_AUTO_ACCEPT:-true}
       TMS_POLL_INTERVAL: ${TMS_POLL_INTERVAL:-60}
+      TMS_AGENT_AUTO_UPDATE: ${TMS_AGENT_AUTO_UPDATE:-true}
       TMS_APK_DIR: /app/data/apks
       TMS_ARTIFACT_DIR: /app/data/artifacts
       # Derrière Caddy : IP réelle des terminaux via X-Forwarded-For

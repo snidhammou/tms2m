@@ -10,4 +10,6 @@ public interface AppPackageRepository extends JpaRepository<AppPackage, Long> {
     boolean existsByPackageNameAndVersionCode(String packageName, long versionCode);
 
     List<AppPackage> findAllByOrderByPackageNameAscVersionCodeDesc();
+
+    List<AppPackage> findByPackageNameOrderByVersionCodeDesc(String packageName);
 }

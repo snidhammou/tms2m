@@ -43,11 +43,13 @@ public class DeviceService {
     private final TmsProperties props;
     private final Path artifactDir;
     private final IconService icons;
+    private final AgentUpdateService agentUpdates;
 
     public DeviceService(TerminalRepository terminals, TaskRepository tasks, TerminalMetricRepository metrics,
                          ParameterService parameters, AuditService audit, JsonSupport json, TmsProperties props,
-                         IconService icons) {
+                         IconService icons, AgentUpdateService agentUpdates) {
         this.icons = icons;
+        this.agentUpdates = agentUpdates;
         this.terminals = terminals;
         this.tasks = tasks;
         this.metrics = metrics;
@@ -94,6 +96,8 @@ public class DeviceService {
             t.setInstalledAppsJson(json.write(req.installedApps()));
         }
         recordMetric(t.getId(), req);
+        // Nouvelle version de l'agent publiée : la tâche d'installation part dans cette même réponse
+        agentUpdates.checkForUpdate(t);
 
         ZoneId zone = ZoneId.systemDefault();
         List<DeviceTask> pending = tasks.findByTerminalIdAndStatusInOrderByIdAsc(terminalId, DELIVERABLE).stream()

@@ -8,7 +8,11 @@ public record TmsProperties(Enrollment enrollment, Device device, Storage storag
     public record Enrollment(String key, boolean autoAccept) {
     }
 
-    public record Device(int pollIntervalSeconds) {
+    /** @param agentAutoUpdate mise à jour automatique de l'agent quand une version plus récente est publiée */
+    public record Device(int pollIntervalSeconds, Boolean agentAutoUpdate) {
+        public boolean agentAutoUpdateOrDefault() {
+            return agentAutoUpdate == null || agentAutoUpdate;
+        }
     }
 
     /**

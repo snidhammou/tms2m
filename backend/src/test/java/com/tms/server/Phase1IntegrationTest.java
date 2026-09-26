@@ -246,6 +246,33 @@ class Phase1IntegrationTest {
         adminGet("/api/admin/v1/apps/icons/com.acme.unknown").andExpect(status().isNotFound());
     }
 
+    @Test
+    void agentAutoUpdateTargetsSameVariantOnce() throws Exception {
+        // APK illisible (factice) : les champs saisis servent de manifeste
+        for (String[] v : new String[][]{{"9.0.1-pax", "90001"}, {"9.0.2", "90002"}}) {
+            mvc.perform(multipart("/api/admin/v1/apps")
+                    .file(new MockMultipartFile("file", "agent.apk", "application/octet-stream", v[0].getBytes()))
+                    .param("packageName", "com.tms.agent").param("versionName", v[0]).param("versionCode", v[1])
+                    .with(httpBasic("admin", "admin123"))).andExpect(status().isCreated());
+        }
+        String token = enroll("AUTOUPD-001").get("deviceToken").asText();
+        String hbBody = "{\"agentVersion\":\"1.0.0-pax\",\"installedApps\":[{\"packageName\":\"com.tms.agent\","
+                + "\"versionName\":\"1.0.0-pax\",\"versionCode\":1}]}";
+
+        JsonNode tasks = json(device(post("/api/device/v1/heartbeat"), token)
+                .contentType(MediaType.APPLICATION_JSON).content(hbBody), 200).get("tasks");
+        // Variante PAX uniquement (la version universal plus récente n'est pas proposée)
+        assertThat(tasks).hasSize(1);
+        assertThat(tasks.get(0).get("type").asText()).isEqualTo("INSTALL_APP");
+        assertThat(tasks.get(0).get("payload").get("versionName").asText()).isEqualTo("9.0.1-pax");
+
+        // Heartbeat suivant : la même tâche est renvoyée, sans doublon
+        JsonNode again = json(device(post("/api/device/v1/heartbeat"), token)
+                .contentType(MediaType.APPLICATION_JSON).content(hbBody), 200).get("tasks");
+        assertThat(again).hasSize(1);
+        assertThat(again.get(0).get("id").asLong()).isEqualTo(tasks.get(0).get("id").asLong());
+    }
+
     private JsonNode enroll(String serial) throws Exception {
         return json(mvc.perform(post("/api/device/v1/enroll").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"serialNumber\":\"" + serial + "\",\"enrollmentKey\":\"TEST-KEY\",\"manufacturer\":\"SUNMI\"}")), 200);

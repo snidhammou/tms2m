@@ -204,6 +204,6 @@ public final class AdminDtos {
     public record MetaDto(
             List<Manufacturer> manufacturers, List<TerminalStatus> terminalStatuses,
             List<TaskType> taskTypes, List<TaskStatus> taskStatuses, List<ParameterScope> parameterScopes,
-            int pollIntervalSeconds, String serverZone) {
+            int pollIntervalSeconds, String serverZone, boolean agentAutoUpdate) {
     }
 }

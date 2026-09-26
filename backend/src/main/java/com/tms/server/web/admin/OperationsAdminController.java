@@ -53,7 +53,7 @@ public class OperationsAdminController {
         return new MetaDto(Arrays.asList(Manufacturer.values()), Arrays.asList(TerminalStatus.values()),
                 Arrays.asList(TaskType.values()), Arrays.asList(TaskStatus.values()),
                 Arrays.asList(ParameterScope.values()), props.device().pollIntervalSeconds(),
-                ZoneId.systemDefault().getId());
+                ZoneId.systemDefault().getId(), props.device().agentAutoUpdateOrDefault());
     }
 
     // ---- Paramètres ----

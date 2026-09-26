@@ -27,6 +27,12 @@ public class AuditService {
         repo.save(new AuditEvent(currentActor(), action, terminalId, details));
     }
 
+    /** Action automatique du serveur (mise à jour de l'agent…). */
+    @Transactional
+    public void logSystem(String action, Long terminalId, String details) {
+        repo.save(new AuditEvent("system", action, terminalId, details));
+    }
+
     @Transactional
     public void logDevice(String action, Long terminalId, String details) {
         repo.save(new AuditEvent("device", action, terminalId, details));

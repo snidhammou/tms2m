@@ -21,6 +21,8 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
 
     List<Task> findByDeploymentIdOrderByIdAsc(String deploymentId);
 
+    Task findTopByTerminalIdAndDeploymentIdOrderByIdDesc(Long terminalId, String deploymentId);
+
     @Query("select t.status, count(t) from Task t group by t.status")
     List<Object[]> countByStatus();
 
