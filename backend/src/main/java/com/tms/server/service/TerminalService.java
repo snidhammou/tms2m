@@ -212,8 +212,8 @@ public class TerminalService {
                 signals.isConnected(t.getId()));
     }
 
-    /** Synchronisation forcée depuis la console. */
-    @Transactional(readOnly = true)
+    /** Synchronisation forcée depuis la console (écrit l'historique : transaction en écriture). */
+    @Transactional
     public SyncResponse forceSync(Long id) {
         Terminal t = find(id);
         boolean delivered = signals.signal(id);

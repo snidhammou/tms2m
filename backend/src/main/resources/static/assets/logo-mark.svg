@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="TMS2M">
+  <!-- Symbole TMS2M : TPE entouré de flèches de synchronisation, dégradé bleu roi → cyan (charte S2M) -->
+  <defs>
+    <linearGradient id="tms2m-g" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#1428C8"/>
+      <stop offset=".55" stop-color="#0A6FD8"/>
+      <stop offset="1" stop-color="#03B2D5"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#tms2m-g)"/>
+  <rect x="20" y="12" width="24" height="40" rx="5" fill="#fff"/>
+  <rect x="24" y="16" width="16" height="11" rx="2" fill="url(#tms2m-g)"/>
+  <g fill="#1428C8" opacity=".85">
+    <circle cx="27" cy="33" r="1.9"/><circle cx="32" cy="33" r="1.9"/><circle cx="37" cy="33" r="1.9"/>
+    <circle cx="27" cy="39" r="1.9"/><circle cx="32" cy="39" r="1.9"/><circle cx="37" cy="39" r="1.9"/>
+    <circle cx="27" cy="45" r="1.9"/><circle cx="32" cy="45" r="1.9"/><circle cx="37" cy="45" r="1.9"/>
+  </g>
+  <g fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M11.2 44A24 24 0 0 1 11.2 20M6.5 21.7L11.2 20L12.1 24.9"/>
+    <path d="M52.8 20A24 24 0 0 1 52.8 44M57.5 42.3L52.8 44L51.9 39.1"/>
+  </g>
+</svg>

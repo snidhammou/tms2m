@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.TmsAgent" parent="Theme.AppCompat.DayNight.DarkActionBar">
-        <item name="colorPrimary">#2F6FDD</item>
-        <item name="colorPrimaryDark">#1F4FA8</item>
-        <item name="colorAccent">#2F6FDD</item>
+    <!-- Charte TMS2M : bleu roi / cyan (logo S2M), en-tête anthracite portant le logo -->
+    <style name="Theme.TmsAgent" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/brand_blue</item>
+        <item name="colorPrimaryDark">@color/header_bg</item>
+        <item name="colorAccent">@color/brand_mid</item>
+        <item name="colorControlActivated">@color/brand_mid</item>
     </style>
 
     <style name="SectionTitle">
@@ -12,7 +14,17 @@
         <item name="android:layout_marginTop">20dp</item>
         <item name="android:layout_marginBottom">6dp</item>
         <item name="android:textStyle">bold</item>
-        <item name="android:textSize">15sp</item>
-        <item name="android:textColor">?attr/colorPrimary</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:letterSpacing">0.08</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:textColor">@color/brand_mid</item>
+    </style>
+
+    <!-- Bouton principal : dégradé de la marque -->
+    <style name="BrandButton" parent="Widget.AppCompat.Button">
+        <item name="android:background">@drawable/btn_brand</item>
+        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:minHeight">48dp</item>
     </style>
 </resources>

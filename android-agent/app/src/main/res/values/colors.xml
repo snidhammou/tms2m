@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Charte TMS2M (dégradé bleu roi → cyan, anthracite), inspirée du logo S2M -->
+<resources>
+    <color name="brand_blue">#1428C8</color>
+    <color name="brand_blue_dark">#0E1D96</color>
+    <color name="brand_mid">#0A6FD8</color>
+    <color name="brand_cyan">#03B2D5</color>
+    <color name="brand_ink">#404040</color>
+    <color name="header_bg">#23272E</color>
+</resources>

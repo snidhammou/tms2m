@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icône TMS2M (Android 5 à 7 : couleurs pleines, les dégradés vectoriels exigent Android 7+). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+    <path android:fillColor="@color/brand_mid"
+        android:pathData="M15,0H49A15,15 0,0 1,64 15V49A15,15 0,0 1,49 64H15A15,15 0,0 1,0 49V15A15,15 0,0 1,15 0Z" />
+    <group android:name="terminal">
+        <path android:fillColor="#FFFFFF"
+            android:pathData="M25,12H39A5,5 0,0 1,44 17V47A5,5 0,0 1,39 52H25A5,5 0,0 1,20 47V17A5,5 0,0 1,25 12Z" />
+        <path android:fillColor="@color/brand_cyan"
+            android:pathData="M26,16H38A2,2 0,0 1,40 18V25A2,2 0,0 1,38 27H26A2,2 0,0 1,24 25V18A2,2 0,0 1,26 16Z" />
+        <path android:fillColor="@color/brand_blue"
+            android:pathData="M25.1,33a1.9,1.9 0,1 0,3.8 0a1.9,1.9 0,1 0,-3.8 0M30.1,33a1.9,1.9 0,1 0,3.8 0a1.9,1.9 0,1 0,-3.8 0M35.1,33a1.9,1.9 0,1 0,3.8 0a1.9,1.9 0,1 0,-3.8 0M25.1,39a1.9,1.9 0,1 0,3.8 0a1.9,1.9 0,1 0,-3.8 0M30.1,39a1.9,1.9 0,1 0,3.8 0a1.9,1.9 0,1 0,-3.8 0M35.1,39a1.9,1.9 0,1 0,3.8 0a1.9,1.9 0,1 0,-3.8 0M25.1,45a1.9,1.9 0,1 0,3.8 0a1.9,1.9 0,1 0,-3.8 0M30.1,45a1.9,1.9 0,1 0,3.8 0a1.9,1.9 0,1 0,-3.8 0M35.1,45a1.9,1.9 0,1 0,3.8 0a1.9,1.9 0,1 0,-3.8 0" />
+    </group>
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="3.2"
+        android:strokeLineCap="round" android:strokeLineJoin="round"
+        android:pathData="M11.2,44A24,24 0,0 1,11.2 20M6.5,21.7L11.2,20L12.1,24.9M52.8,20A24,24 0,0 1,52.8 44M57.5,42.3L52.8,44L51.9,39.1" />
+</vector>
