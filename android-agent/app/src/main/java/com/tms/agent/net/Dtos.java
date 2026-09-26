@@ -48,6 +48,19 @@ public final class Dtos {
         public String firmwareVersion;
         public String agentVersion;
         public List<InstalledApp> installedApps;
+        // Supervision
+        public Long storageTotalBytes;
+        public Long storageFreeBytes;
+        public Long ramTotalBytes;
+        public Long ramAvailBytes;
+        public String networkType;
+        public Long rxBytes;
+        public Long txBytes;
+        public Long uptimeSeconds;
+        public Boolean deviceOwner;
+        // Configuration appliquée
+        public String autoRunPackage;
+        public List<String> kioskPackages;
     }
 
     public static class DeviceTask {
@@ -64,6 +77,14 @@ public final class Dtos {
             return payload != null && payload.has(key) && !payload.get(key).isJsonNull()
                     ? payload.get(key).getAsLong() : fallback;
         }
+
+        public List<String> payloadStringList(String key) {
+            List<String> list = new java.util.ArrayList<>();
+            if (payload != null && payload.has(key) && payload.get(key).isJsonArray()) {
+                payload.getAsJsonArray(key).forEach(e -> list.add(e.getAsString()));
+            }
+            return list;
+        }
     }
 
     public static class HeartbeatResponse {
@@ -75,10 +96,13 @@ public final class Dtos {
     public static class TaskStatusUpdate {
         public String status;
         public String message;
+        /** Rapport structuré (diagnostic…), facultatif. */
+        public Map<String, Object> result;
 
-        public TaskStatusUpdate(String status, String message) {
+        public TaskStatusUpdate(String status, String message, Map<String, Object> result) {
             this.status = status;
             this.message = message;
+            this.result = result;
         }
     }
 

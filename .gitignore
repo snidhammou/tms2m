@@ -12,6 +12,9 @@ local.properties
 .vscode/
 captures/
 
+# --- Secrets de production ---
+deploy/.env
+
 # --- Signature : informations de keystore locales ---
 android-agent/keystore.properties
 *.jks

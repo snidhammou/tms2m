@@ -49,6 +49,30 @@ public class AgentDeviceAdmin extends DeviceAdminReceiver {
         }
     }
 
+    /**
+     * En Device Owner, l'agent s'accorde les permissions utiles à la supervision
+     * (position du terminal, lecture de fichiers pour l'extraction) sans intervention à l'écran.
+     */
+    public static void grantSelfPermissions(Context context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || !isDeviceOwner(context)) {
+            return;
+        }
+        DevicePolicyManager dpm = (DevicePolicyManager) context.getSystemService(Context.DEVICE_POLICY_SERVICE);
+        String[] perms = {
+                android.Manifest.permission.ACCESS_FINE_LOCATION,
+                android.Manifest.permission.ACCESS_COARSE_LOCATION,
+                android.Manifest.permission.READ_EXTERNAL_STORAGE,
+        };
+        for (String p : perms) {
+            try {
+                dpm.setPermissionGrantState(component(context), context.getPackageName(), p,
+                        DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED);
+            } catch (Exception e) {
+                Log.w(TAG, "Permission " + p + " non accordée : " + e.getMessage());
+            }
+        }
+    }
+
     @Override
     public void onEnabled(Context context, Intent intent) {
         Log.i(TAG, "Administrateur activé (Device Owner : " + isDeviceOwner(context) + ")");

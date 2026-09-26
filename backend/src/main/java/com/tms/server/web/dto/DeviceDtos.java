@@ -39,7 +39,20 @@ public final class DeviceDtos {
             String osVersion,
             String firmwareVersion,
             String agentVersion,
-            List<InstalledApp> installedApps) {
+            List<InstalledApp> installedApps,
+            // Supervision
+            Long storageTotalBytes,
+            Long storageFreeBytes,
+            Long ramTotalBytes,
+            Long ramAvailBytes,
+            String networkType,
+            Long rxBytes,
+            Long txBytes,
+            Long uptimeSeconds,
+            Boolean deviceOwner,
+            // Configuration effectivement appliquée sur le terminal
+            String autoRunPackage,
+            List<String> kioskPackages) {
     }
 
     public record DeviceTask(Long id, TaskType type, Map<String, Object> payload) {
@@ -48,7 +61,8 @@ public final class DeviceDtos {
     public record HeartbeatResponse(Instant serverTime, int pollIntervalSeconds, List<DeviceTask> tasks) {
     }
 
-    public record TaskStatusUpdate(@NotNull TaskStatus status, String message) {
+    /** {@code result} : rapport structuré (diagnostic…), stocké tel quel. */
+    public record TaskStatusUpdate(@NotNull TaskStatus status, String message, Map<String, Object> result) {
     }
 
     public record ParametersResponse(String packageName, Map<String, String> parameters) {

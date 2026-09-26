@@ -15,6 +15,13 @@ public class TerminalGroup {
 
     private String description;
 
+    /** Modèle appliqué automatiquement aux terminaux qui rejoignent ce groupe (zéro contact). */
+    @ManyToOne
+    @JoinColumn(name = "template_id")
+    private DeploymentTemplate template;
+
+    public DeploymentTemplate getTemplate() { return template; }
+    public void setTemplate(DeploymentTemplate template) { this.template = template; }
     public Long getId() { return id; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }

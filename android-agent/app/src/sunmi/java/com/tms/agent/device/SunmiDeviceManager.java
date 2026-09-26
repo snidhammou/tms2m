@@ -123,6 +123,11 @@ public class SunmiDeviceManager extends GenericDeviceManager {
     }
 
     @Override
+    public String sdkStatus() {
+        return "PayLib Sunmi : " + (basic() != null ? "connecté" : "indisponible");
+    }
+
+    @Override
     public OpResult reboot() {
         BasicOptV2 b = basic();
         if (b != null) {

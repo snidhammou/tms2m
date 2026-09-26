@@ -22,10 +22,12 @@ public class EnrollmentService {
 
     private final TerminalRepository terminals;
     private final TmsProperties props;
+    private final AuditService audit;
 
-    public EnrollmentService(TerminalRepository terminals, TmsProperties props) {
+    public EnrollmentService(TerminalRepository terminals, TmsProperties props, AuditService audit) {
         this.terminals = terminals;
         this.props = props;
+        this.audit = audit;
     }
 
     /**
@@ -66,6 +68,8 @@ public class EnrollmentService {
         terminal.setEnrolledAt(now);
         terminal.setLastSeenAt(now);
         terminals.save(terminal);
+        audit.logDevice("ENROLLED", terminal.getId(),
+                terminal.getManufacturer() + " " + terminal.getModel() + ", agent " + terminal.getAgentVersion());
 
         log.info("Terminal enrôlé : {} ({} {})", serial, terminal.getManufacturer(), terminal.getModel());
         return new EnrollResponse(terminal.getId(), token, props.device().pollIntervalSeconds());

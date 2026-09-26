@@ -59,6 +59,44 @@ public class Terminal {
     @Column(columnDefinition = "text")
     private String installedAppsJson;
 
+    // --- Supervision (dernier heartbeat) ---
+    private Long storageTotalBytes;
+    private Long storageFreeBytes;
+    private Long ramTotalBytes;
+    private Long ramAvailBytes;
+    @Column(length = 16)
+    private String networkType;
+    private Long uptimeSeconds;
+    private Instant locationAt;
+    /** L'agent est Device Owner (reboot et installations silencieux). */
+    private Boolean deviceOwner;
+
+    // --- Configuration appliquée (retour de l'agent) ---
+    private String autoRunPackage;
+    @Column(columnDefinition = "text")
+    private String kioskPackagesJson;
+
+    public Long getStorageTotalBytes() { return storageTotalBytes; }
+    public void setStorageTotalBytes(Long v) { this.storageTotalBytes = v; }
+    public Long getStorageFreeBytes() { return storageFreeBytes; }
+    public void setStorageFreeBytes(Long v) { this.storageFreeBytes = v; }
+    public Long getRamTotalBytes() { return ramTotalBytes; }
+    public void setRamTotalBytes(Long v) { this.ramTotalBytes = v; }
+    public Long getRamAvailBytes() { return ramAvailBytes; }
+    public void setRamAvailBytes(Long v) { this.ramAvailBytes = v; }
+    public String getNetworkType() { return networkType; }
+    public void setNetworkType(String v) { this.networkType = v; }
+    public Long getUptimeSeconds() { return uptimeSeconds; }
+    public void setUptimeSeconds(Long v) { this.uptimeSeconds = v; }
+    public Instant getLocationAt() { return locationAt; }
+    public void setLocationAt(Instant v) { this.locationAt = v; }
+    public Boolean getDeviceOwner() { return deviceOwner; }
+    public void setDeviceOwner(Boolean v) { this.deviceOwner = v; }
+    public String getAutoRunPackage() { return autoRunPackage; }
+    public void setAutoRunPackage(String v) { this.autoRunPackage = v; }
+    public String getKioskPackagesJson() { return kioskPackagesJson; }
+    public void setKioskPackagesJson(String v) { this.kioskPackagesJson = v; }
+
     public Long getId() { return id; }
     public String getSerialNumber() { return serialNumber; }
     public void setSerialNumber(String serialNumber) { this.serialNumber = serialNumber; }

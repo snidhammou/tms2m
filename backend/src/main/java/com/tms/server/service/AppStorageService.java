@@ -37,7 +37,7 @@ public class AppStorageService {
 
     public AppStorageService(AppPackageRepository repo, TmsProperties props) {
         this.repo = repo;
-        this.storageDir = Path.of(props.storage().apkDir()).toAbsolutePath();
+        this.storageDir = Path.of(props.storage().apkDir()).toAbsolutePath().normalize();
         try {
             Files.createDirectories(storageDir);
         } catch (IOException e) {

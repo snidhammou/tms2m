@@ -37,6 +37,18 @@ public class JsonSupport {
         return read(json, APPS, List.of());
     }
 
+    public List<Long> readLongList(String json) {
+        return read(json, new TypeReference<List<Long>>() { }, List.of());
+    }
+
+    public List<String> readStringList(String json) {
+        return read(json, new TypeReference<List<String>>() { }, List.of());
+    }
+
+    public Map<String, String> readStringMap(String json) {
+        return read(json, new TypeReference<Map<String, String>>() { }, Map.of());
+    }
+
     private <T> T read(String json, TypeReference<T> type, T fallback) {
         if (json == null || json.isBlank()) {
             return fallback;

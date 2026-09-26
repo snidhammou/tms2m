@@ -13,6 +13,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * API consommée par l'agent Android. Toutes les routes sauf /enroll exigent
@@ -47,6 +48,14 @@ public class DeviceController {
     public ResponseEntity<Void> taskStatus(Authentication auth, @PathVariable Long taskId,
                                            @Valid @RequestBody TaskStatusUpdate update) {
         devices.updateTaskStatus(terminalId(auth), taskId, update);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Fichier produit par une tâche (logs, fichier extrait). */
+    @PostMapping(value = "/tasks/{taskId}/artifact", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Void> taskArtifact(Authentication auth, @PathVariable Long taskId,
+                                             @RequestParam("file") MultipartFile file) {
+        devices.uploadArtifact(terminalId(auth), taskId, file);
         return ResponseEntity.noContent().build();
     }
 

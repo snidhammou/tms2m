@@ -145,6 +145,11 @@ public class PaxDeviceManager extends GenericDeviceManager {
     }
 
     @Override
+    public String sdkStatus() {
+        return "NeptuneLite PAX : " + (sys() != null ? "DAL disponible" : "indisponible");
+    }
+
+    @Override
     public OpResult reboot() {
         ISys sys = sys();
         if (sys != null) {

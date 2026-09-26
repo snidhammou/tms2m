@@ -1,0 +1,64 @@
+# Déploiement de production TMS2M : Caddy (HTTPS Let's Encrypt) + serveur TMS + PostgreSQL.
+# Usage sur le serveur : docker compose --env-file .env up -d --build
+# Seuls les ports 80/443 (Caddy) sont exposés ; le TMS et PostgreSQL restent sur le réseau interne.
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: tms
+      POSTGRES_USER: tms
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD manquant}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tms -d tms"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  tms-server:
+    build: ../backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: postgres
+      DB_URL: jdbc:postgresql://postgres:5432/tms
+      DB_USER: tms
+      DB_PASSWORD: ${DB_PASSWORD}
+      TMS_ADMIN_USER: ${TMS_ADMIN_USER:-admin}
+      TMS_ADMIN_PASSWORD: ${TMS_ADMIN_PASSWORD:?TMS_ADMIN_PASSWORD manquant}
+      TMS_ENROLLMENT_KEY: ${TMS_ENROLLMENT_KEY:?TMS_ENROLLMENT_KEY manquant}
+      TMS_AUTO_ACCEPT: ${TMS_AUTO_ACCEPT:-true}
+      TMS_POLL_INTERVAL: ${TMS_POLL_INTERVAL:-60}
+      TMS_APK_DIR: /app/data/apks
+      TMS_ARTIFACT_DIR: /app/data/artifacts
+      # Derrière Caddy : IP réelle des terminaux via X-Forwarded-For
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+    volumes:
+      - tmsdata:/app/data
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - tms-server
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      TMS_DOMAIN: ${TMS_DOMAIN:?TMS_DOMAIN manquant}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL manquant}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  tmsdata:
+  caddy_data:
+  caddy_config:

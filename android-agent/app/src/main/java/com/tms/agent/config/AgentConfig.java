@@ -140,4 +140,36 @@ public class AgentConfig {
     public void clearPendingReboot() {
         prefs.edit().remove(K_REBOOT_TASK).remove(K_REBOOT_BOOT_TIME).commit();
     }
+
+    // --- Démarrage auto et kiosque (appliqués par l'agent, relancés au boot)
+
+    private static final String K_AUTORUN = "autorun_package";
+    private static final String K_KIOSK = "kiosk_packages";
+
+    public String getAutoRunPackage() {
+        return prefs.getString(K_AUTORUN, null);
+    }
+
+    public void setAutoRunPackage(String packageName) {
+        if (packageName == null || packageName.isEmpty()) {
+            prefs.edit().remove(K_AUTORUN).apply();
+        } else {
+            prefs.edit().putString(K_AUTORUN, packageName).apply();
+        }
+    }
+
+    public java.util.List<String> getKioskPackages() {
+        String v = prefs.getString(K_KIOSK, "");
+        java.util.List<String> list = new java.util.ArrayList<>();
+        for (String s : v.split(",")) {
+            if (!s.trim().isEmpty()) {
+                list.add(s.trim());
+            }
+        }
+        return list;
+    }
+
+    public void setKioskPackages(java.util.List<String> packages) {
+        prefs.edit().putString(K_KIOSK, android.text.TextUtils.join(",", packages)).apply();
+    }
 }

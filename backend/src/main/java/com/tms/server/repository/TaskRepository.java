@@ -27,4 +27,7 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     @Modifying
     @Query("delete from Task t where t.terminal.id = :terminalId")
     void deleteByTerminalId(Long terminalId);
+
+    List<Task> findByTerminalIdAndTypeInAndStatusIn(Long terminalId, Collection<com.tms.server.domain.TaskType> types,
+                                                    Collection<TaskStatus> statuses);
 }

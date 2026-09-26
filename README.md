@@ -29,6 +29,22 @@ Terminal Management System composé de :
 - **Paramètres applicatifs** à 3 niveaux, GLOBAL → GROUPE → TERMINAL (le plus spécifique l'emporte).
 - **Fiabilité de l'agent** : outbox persistante des statuts, reprise après auto-mise à jour, redémarrage au boot.
 
+### Fonctions « TOMS » (phase 1)
+
+| Module | Détail |
+|---|---|
+| **Organisations** | Hiérarchie (ex. acquéreur > région > agence), marchands rattachés. Filtrer ou déployer sur une organisation inclut ses sous-organisations |
+| **Zéro contact** | *Modèles de déploiement* (applications, modèles de paramètres, démarrage auto, kiosque) liés à un **groupe** : appliqués automatiquement au pré-enregistrement, à l'enrôlement ou au changement de groupe. Pré-enregistrement **par lots** |
+| **Modèles de paramètres** | Jeux clé/valeur réutilisables par application, applicables à un niveau (global / groupe / terminal) avec push |
+| **Mise à jour planifiée** | Tâches « pas avant » une date et/ou dans une fenêtre quotidienne (ex. 22:00 → 06:00) |
+| **Démarrage auto** | Application lancée au démarrage du terminal |
+| **Mode kiosque** | Terminal verrouillé sur une liste d'applications (Device Owner requis) |
+| **Supervision** | Stockage, mémoire, type de réseau, trafic, uptime, position ; graphiques sur 24 h (conservation configurable, 7 jours par défaut) ; alertes batterie < 20 % et stockage < 10 % |
+| **Historique** | Journal des actions admin et des événements terminaux (enrôlement, applis installées / mises à jour / retirées, zéro contact) |
+| **Assistance à distance** | Diagnostic (rapport d'état, joignabilité serveur, dérive d'horloge), extraction des logs de l'agent, extraction d'un fichier du terminal |
+
+Limites connues : seuls les logs de l'agent sont accessibles (logs système réservés aux applis signées système) ; la position n'est disponible que si le terminal a un fournisseur de localisation actif ; le firmware, le bureau à distance et l'injection de clés (RKI) ne sont pas couverts.
+
 ## Démarrage rapide
 
 ### Backend

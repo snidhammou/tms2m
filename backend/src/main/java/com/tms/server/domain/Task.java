@@ -3,6 +3,7 @@ package com.tms.server.domain;
 import jakarta.persistence.*;
 
 import java.time.Instant;
+import java.time.LocalTime;
 
 @Entity
 @Table(name = "tasks", indexes = {
@@ -39,6 +40,51 @@ public class Task {
 
     private Instant createdAt = Instant.now();
     private Instant updatedAt = Instant.now();
+
+    // --- Planification (mise à jour planifiée) ---
+    /** La tâche n'est pas délivrée avant cet instant (null = immédiat). */
+    private Instant notBefore;
+    /** Fenêtre quotidienne de livraison, heure du serveur (null = toute la journée). */
+    private LocalTime windowStart;
+    private LocalTime windowEnd;
+
+    // --- Résultats (diagnostic, extraction de logs / fichiers) ---
+    @Column(columnDefinition = "text")
+    private String resultJson;
+    /** Fichier téléversé par le terminal (nom de stockage). */
+    private String artifactStoredName;
+    /** Nom d'origine du fichier téléversé. */
+    private String artifactName;
+    private Long artifactSize;
+
+    public Instant getNotBefore() { return notBefore; }
+    public void setNotBefore(Instant notBefore) { this.notBefore = notBefore; }
+    public LocalTime getWindowStart() { return windowStart; }
+    public void setWindowStart(LocalTime windowStart) { this.windowStart = windowStart; }
+    public LocalTime getWindowEnd() { return windowEnd; }
+    public void setWindowEnd(LocalTime windowEnd) { this.windowEnd = windowEnd; }
+    public String getResultJson() { return resultJson; }
+    public void setResultJson(String resultJson) { this.resultJson = resultJson; }
+    public String getArtifactStoredName() { return artifactStoredName; }
+    public void setArtifactStoredName(String v) { this.artifactStoredName = v; }
+    public String getArtifactName() { return artifactName; }
+    public void setArtifactName(String v) { this.artifactName = v; }
+    public Long getArtifactSize() { return artifactSize; }
+    public void setArtifactSize(Long v) { this.artifactSize = v; }
+
+    /** Vrai si la tâche peut être délivrée à cet instant (planification respectée). */
+    public boolean isDeliverableAt(Instant now, java.time.ZoneId zone) {
+        if (notBefore != null && now.isBefore(notBefore)) {
+            return false;
+        }
+        if (windowStart == null || windowEnd == null) {
+            return true;
+        }
+        LocalTime t = now.atZone(zone).toLocalTime();
+        return windowStart.isBefore(windowEnd)
+                ? !t.isBefore(windowStart) && t.isBefore(windowEnd)
+                : !t.isBefore(windowStart) || t.isBefore(windowEnd); // fenêtre de nuit (ex. 22:00 → 06:00)
+    }
 
     public Long getId() { return id; }
     public Terminal getTerminal() { return terminal; }

@@ -41,14 +41,19 @@ public class TaskExecutor {
     private final ApiClient client;
     private final StatusOutbox outbox;
     private final ParameterStore parameters;
+    private final DeviceInfo deviceInfo;
+    private final Diagnostics diagnostics;
 
-    public TaskExecutor(AgentApp app, ApiClient client, StatusOutbox outbox, ParameterStore parameters) {
+    public TaskExecutor(AgentApp app, ApiClient client, StatusOutbox outbox, ParameterStore parameters,
+                        DeviceInfo deviceInfo) {
         this.context = app;
         this.config = app.config();
         this.device = app.device();
         this.client = client;
         this.outbox = outbox;
         this.parameters = parameters;
+        this.deviceInfo = deviceInfo;
+        this.diagnostics = new Diagnostics(app, deviceInfo, client);
     }
 
     public void execute(Dtos.DeviceTask task) {
@@ -69,6 +74,22 @@ public class TaskExecutor {
                 case "REBOOT":
                     reboot(task);
                     return;
+                case "SET_AUTORUN":
+                    result = AppLauncher.setAutoRun(context, task.payloadString("packageName"));
+                    break;
+                case "SET_KIOSK":
+                    result = AppLauncher.setKiosk(context, task.payloadStringList("packages"));
+                    break;
+                case "DIAGNOSE":
+                    java.util.Map<String, Object> report = diagnostics.run();
+                    report(task.id, "SUCCESS", diagnostics.summary(report), report);
+                    return;
+                case "EXTRACT_LOGS":
+                    result = diagnostics.extractLogs(task.id, (int) task.payloadLong("lines", 2000));
+                    break;
+                case "EXTRACT_FILE":
+                    result = diagnostics.extractFile(task.id, required(task, "path"));
+                    break;
                 default:
                     result = OpResult.fail("Type de tâche non supporté : " + task.type);
             }
@@ -81,7 +102,11 @@ public class TaskExecutor {
 
     /** Remonte un statut ; en cas d'échec réseau il est conservé dans l'outbox. */
     void report(long taskId, String status, String message) {
-        outbox.add(taskId, status, message);
+        report(taskId, status, message, null);
+    }
+
+    void report(long taskId, String status, String message, java.util.Map<String, Object> result) {
+        outbox.add(taskId, status, message, result);
         try {
             outbox.flush(client.api());
         } catch (Exception e) {

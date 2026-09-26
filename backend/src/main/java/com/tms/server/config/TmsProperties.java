@@ -11,7 +11,18 @@ public record TmsProperties(Enrollment enrollment, Device device, Storage storag
     public record Device(int pollIntervalSeconds) {
     }
 
-    public record Storage(String apkDir) {
+    /**
+     * @param artifactDir fichiers téléversés par les terminaux (logs, fichiers extraits)
+     * @param metricsRetentionDays durée de conservation des points de supervision
+     */
+    public record Storage(String apkDir, String artifactDir, Integer metricsRetentionDays) {
+        public String artifactDirOrDefault() {
+            return artifactDir == null || artifactDir.isBlank() ? "./data/artifacts" : artifactDir;
+        }
+
+        public int retentionDaysOrDefault() {
+            return metricsRetentionDays == null || metricsRetentionDays <= 0 ? 7 : metricsRetentionDays;
+        }
     }
 
     public record Admin(String username, String password) {

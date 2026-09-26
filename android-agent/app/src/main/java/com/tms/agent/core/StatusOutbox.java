@@ -30,9 +30,9 @@ public class StatusOutbox {
         prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
-    public synchronized void add(long taskId, String status, String message) {
+    public synchronized void add(long taskId, String status, String message, java.util.Map<String, Object> result) {
         List<Item> items = load();
-        items.add(new Item(taskId, status, message));
+        items.add(new Item(taskId, status, message, result));
         save(items);
     }
 
@@ -42,7 +42,7 @@ public class StatusOutbox {
         while (!items.isEmpty()) {
             Item item = items.get(0);
             Response<Void> resp = api.updateTaskStatus(item.taskId,
-                    new Dtos.TaskStatusUpdate(item.status, item.message)).execute();
+                    new Dtos.TaskStatusUpdate(item.status, item.message, item.result)).execute();
             // 5xx / 401 (jeton à renouveler) : on garde pour plus tard.
             // Autres 4xx (tâche supprimée…) : inutile de réessayer indéfiniment.
             if (!resp.isSuccessful() && (resp.code() >= 500 || resp.code() == 401)) {
@@ -70,11 +70,13 @@ public class StatusOutbox {
         long taskId;
         String status;
         String message;
+        java.util.Map<String, Object> result;
 
-        Item(long taskId, String status, String message) {
+        Item(long taskId, String status, String message, java.util.Map<String, Object> result) {
             this.taskId = taskId;
             this.status = status;
             this.message = message;
+            this.result = result;
         }
     }
 }

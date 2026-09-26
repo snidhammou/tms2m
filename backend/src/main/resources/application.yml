@@ -29,6 +29,10 @@ tms:
     poll-interval-seconds: ${TMS_POLL_INTERVAL:60}
   storage:
     apk-dir: ${TMS_APK_DIR:./data/apks}
+    # Logs et fichiers extraits des terminaux
+    artifact-dir: ${TMS_ARTIFACT_DIR:./data/artifacts}
+    # Conservation des points de supervision (graphiques)
+    metrics-retention-days: ${TMS_METRICS_RETENTION_DAYS:7}
   admin:
     username: ${TMS_ADMIN_USER:admin}
     password: ${TMS_ADMIN_PASSWORD:admin123}

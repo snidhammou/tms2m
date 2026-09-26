@@ -1,0 +1,27 @@
+# HTTPS automatique (certificat Let's Encrypt renouvelé par Caddy).
+{
+	email {$ACME_EMAIL}
+}
+
+# www.tms2m.com -> tms2m.com
+www.{$TMS_DOMAIN} {
+	redir https://{$TMS_DOMAIN}{uri} permanent
+}
+
+{$TMS_DOMAIN} {
+	encode gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# APK volumineux (Egate ≈ 42 Mo) : limite alignée sur celle du serveur (512 Mo)
+	request_body {
+		max_size 512MB
+	}
+
+	reverse_proxy tms-server:8095
+}

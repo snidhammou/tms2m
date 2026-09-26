@@ -30,8 +30,11 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, Object>> handleIntegrity(DataIntegrityViolationException e) {
+        log.warn("Violation de contrainte : {}", e.getMostSpecificCause().getMessage());
         return body(HttpStatus.CONFLICT, "Violation de contrainte (doublon ou élément référencé)");
     }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ApiExceptionHandler.class);
 
     private static ResponseEntity<Map<String, Object>> body(HttpStatus status, String message) {
         return ResponseEntity.status(status).body(Map.of(

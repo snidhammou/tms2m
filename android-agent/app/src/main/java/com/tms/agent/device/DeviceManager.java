@@ -28,4 +28,9 @@ public interface DeviceManager {
     boolean canReboot();
 
     OpResult reboot();
+
+    /** État du SDK constructeur, pour le diagnostic à distance. */
+    default String sdkStatus() {
+        return "aucun SDK constructeur (API Android standard)";
+    }
 }

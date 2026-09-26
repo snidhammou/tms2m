@@ -90,5 +90,10 @@ public class NewlandDeviceManager extends GenericDeviceManager {
         return cachedFirmware;
     }
 
+    @Override
+    public String sdkStatus() {
+        return "MESDK Newland : " + (sdk() ? "initialisé" : "indisponible");
+    }
+
     // canReboot() / reboot() : implémentation générique (Device Owner, ou permission REBOOT si signé système Newland).
 }

@@ -32,9 +32,11 @@ public class SyncEngine {
         this.device = app.device();
         this.client = new ApiClient(config);
         this.outbox = new StatusOutbox(app);
-        this.deviceInfo = new DeviceInfo(app, device);
-        this.tasks = new TaskExecutor(app, client, outbox, new ParameterStore(app));
+        this.deviceInfo = new DeviceInfo(app, device, config);
+        this.tasks = new TaskExecutor(app, client, outbox, new ParameterStore(app), deviceInfo);
     }
+
+    private boolean permissionsGranted;
 
     public void runOnce() {
         if (!config.isConfigured()) {
@@ -44,6 +46,11 @@ public class SyncEngine {
         try {
             if (!config.isEnrolled() && !enroll()) {
                 return;
+            }
+            if (!permissionsGranted) {
+                // En Device Owner : position et lecture de fichiers accordées sans intervention à l'écran
+                com.tms.agent.admin.AgentDeviceAdmin.grantSelfPermissions(app);
+                permissionsGranted = true;
             }
             outbox.flush(client.api());
             closePendingSelfUpdate();

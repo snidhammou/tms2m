@@ -34,8 +34,20 @@ public interface TerminalRepository extends JpaRepository<Terminal, Long>, JpaSp
     /** Filtre combinable utilisé par la liste admin et par les déploiements. */
     static Specification<Terminal> filter(Manufacturer manufacturer, TerminalStatus status,
                                           Long groupId, Long merchantId, String query) {
+        return filter(manufacturer, status, groupId, merchantId, null, query);
+    }
+
+    /**
+     * @param organizationIds organisation ciblée et toutes ses descendantes (null = pas de filtre).
+     */
+    static Specification<Terminal> filter(Manufacturer manufacturer, TerminalStatus status,
+                                          Long groupId, Long merchantId,
+                                          java.util.Collection<Long> organizationIds, String query) {
         return (root, cq, cb) -> {
             var p = cb.conjunction();
+            if (organizationIds != null) {
+                p = cb.and(p, root.join("merchant").get("organization").get("id").in(organizationIds));
+            }
             if (manufacturer != null) {
                 p = cb.and(p, cb.equal(root.get("manufacturer"), manufacturer));
             }

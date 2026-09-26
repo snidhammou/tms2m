@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>TMS Console</title>
+    <title>TMS2M Console</title>
     <link rel="stylesheet" href="assets/app.css">
 </head>
 <body>
 
 <section id="login" class="login hidden">
     <form id="loginForm" class="login-card">
-        <div class="brand"><span class="logo">◈</span> TMS Console</div>
+        <div class="brand"><span class="logo">◈</span> TMS2M Console</div>
         <p class="muted">Gestion multi-constructeur des terminaux<br>Newland · PAX · Sunmi · …</p>
         <label>Utilisateur <input name="username" autocomplete="username" required></label>
         <label>Mot de passe <input name="password" type="password" autocomplete="current-password" required></label>
@@ -21,13 +21,19 @@
 
 <div id="app" class="layout hidden">
     <aside class="sidebar">
-        <div class="brand"><span class="logo">◈</span> TMS</div>
+        <div class="brand"><span class="logo">◈</span> TMS2M</div>
         <nav id="nav">
+            <div class="nav-section">Parc</div>
             <a data-view="dashboard">Tableau de bord</a>
             <a data-view="terminals">Terminaux</a>
+            <a data-view="tasks">Tâches</a>
+            <a data-view="audit">Historique</a>
+            <div class="nav-section">Applications</div>
             <a data-view="apps">Applications</a>
             <a data-view="parameters">Paramètres</a>
-            <a data-view="tasks">Tâches</a>
+            <a data-view="templates">Modèles</a>
+            <div class="nav-section">Organisation</div>
+            <a data-view="organizations">Organisations</a>
             <a data-view="merchants">Marchands</a>
             <a data-view="groups">Groupes</a>
         </nav>
