@@ -28,6 +28,11 @@ Terminal Management System composé de :
 - **Déploiements** : `INSTALL_APP`, `UNINSTALL_APP`, `PUSH_PARAMS`, `REBOOT` ciblant des terminaux, un groupe, un marchand, un constructeur ou tout le parc. Les terminaux pré-enregistrés reçoivent leurs tâches dès l'enrôlement (staging).
 - **Paramètres applicatifs** à 3 niveaux, GLOBAL → GROUPE → TERMINAL (le plus spécifique l'emporte).
 - **Fiabilité de l'agent** : outbox persistante des statuts, reprise après auto-mise à jour, redémarrage au boot.
+- **Temps réel** : l'agent garde une requête longue ouverte (`/api/device/v1/wait`) ; bouton **Synchroniser** dans la console et tâches délivrées immédiatement. Le polling reste le filet de sécurité.
+- **Notifications** en bas à gauche de la console à la fin de chaque tâche (✅ / ❌ et message du terminal).
+- **Icônes** : pictogramme de TPE aux couleurs de la marque dans la liste des terminaux ; icônes des applications (extraites des APK du dépôt ou envoyées par l'agent).
+- **Désinstallation** d'une application depuis l'onglet Applications d'un terminal (l'agent TMS lui-même est protégé).
+- **Mise à jour automatique de l'agent** : voir [Publier une nouvelle version de l'agent](#publier-une-nouvelle-version-de-lagent).
 
 ### Fonctions « TOMS » (phase 1)
 
@@ -41,9 +46,45 @@ Terminal Management System composé de :
 | **Mode kiosque** | Terminal verrouillé sur une liste d'applications (Device Owner requis) |
 | **Supervision** | Stockage, mémoire, type de réseau, trafic, uptime, position ; graphiques sur 24 h (conservation configurable, 7 jours par défaut) ; alertes batterie < 20 % et stockage < 10 % |
 | **Historique** | Journal des actions admin et des événements terminaux (enrôlement, applis installées / mises à jour / retirées, zéro contact) |
-| **Assistance à distance** | Diagnostic (rapport d'état, joignabilité serveur, dérive d'horloge), extraction des logs de l'agent, extraction d'un fichier du terminal |
+| **Assistance à distance** | Diagnostic (rapport d'état, joignabilité serveur, dérive d'horloge), extraction des logs par application et par plage horaire (jusqu'à 200 000 lignes, fichier .gz), extraction d'un fichier du terminal |
 
-Limites connues : seuls les logs de l'agent sont accessibles (logs système réservés aux applis signées système) ; la position n'est disponible que si le terminal a un fournisseur de localisation actif ; le firmware, le bureau à distance et l'injection de clés (RKI) ne sont pas couverts.
+Limites connues : les logs des autres applications exigent la permission `READ_LOGS`, accordée une fois par adb (`adb shell pm grant com.tms.agent android.permission.READ_LOGS`), sinon seuls ceux de l'agent sont remontés ; le journal Android est circulaire (agrandir le tampon dans les options développeur) ; la position n'est disponible que si le terminal a un fournisseur de localisation actif ; le firmware, le bureau à distance et l'injection de clés (RKI) ne sont pas couverts.
+
+## Ouvrir le projet (IDE)
+
+Le dépôt contient **deux projets Gradle indépendants** : ouvrez chacun **dans son IDE, à partir de son sous-dossier** (la racine du dépôt n'est pas un projet Gradle).
+
+| Dossier | Contenu | IDE conseillé |
+|---|---|---|
+| `backend/` | Serveur Spring Boot et console web (`src/main/resources/static`) | **IntelliJ IDEA** (Community suffit) |
+| `android-agent/` | TMS2M Agent (4 variantes) et l'app de démo AIDL `sample-client` | **Android Studio** |
+| `deploy/`, `tools/` | Scripts PowerShell, Docker Compose, Caddy | VS Code ou IntelliJ |
+
+**Backend (IntelliJ IDEA)**
+1. *File › Open* → `backend/` : le projet Gradle est importé automatiquement.
+2. JDK **17** (*File › Project Structure › SDK*).
+3. Lancer `TmsServerApplication` (ou la tâche Gradle `bootRun`) → console sur http://localhost:8095 (identifiants de développement ci-dessous).
+4. Tests : tâche Gradle `test`, ou clic droit sur `src/test`. Base H2 locale dans `backend/data/` (non versionnée).
+
+**Agent (Android Studio)**
+1. *File › Open* → `android-agent/`.
+2. Panneau *Build Variants* : choisir `newlandDebug`, `paxDebug`, `sunmiDebug` ou `universalDebug`.
+3. Un *Run ▶* produit un agent de développement qui pointe par défaut sur `http://10.0.2.2:8095` (le PC vu depuis l'émulateur) ; l'URL reste modifiable dans l'écran de l'agent.
+4. Les **APK de production** se construisent toujours avec `tools\build-agent-release.ps1` (voir plus bas).
+
+**Fichiers non versionnés** à placer sur chaque poste (à recopier après un `git clone`) :
+
+| Fichier | Rôle |
+|---|---|
+| `android-agent/local.properties` | Chemin du SDK Android (créé par Android Studio) |
+| `android-agent/keystore.properties` + keystore `.jks` | Signature S2M (modèle : `keystore.properties.example`) |
+| `android-agent/app/libs/newland/MESDK-*.aar`, `pax/NeptuneLiteApi_*.jar`, `sunmi/PayLib-*.aar` | SDK constructeurs |
+| `deploy/.env` | Secrets de production (généré par `deploy/new-env.ps1`) |
+
+**Particularités Windows**
+- Gardez le projet dans un **chemin court** (ex. `C:\MyWorkspace\tms-multibrand`) : `aidl.exe` échoue au-delà de 260 caractères.
+- Si Gradle échoue avec « Unable to establish loopback connection », définir la variable d'environnement :
+  `JAVA_TOOL_OPTIONS=-Djdk.net.unixdomain.tmpdir=%USERPROFILE%\.gradle` (variable Windows ou configuration de lancement de l'IDE).
 
 ## Démarrage rapide
 
@@ -54,13 +95,18 @@ cd backend
 ```
 Console : http://localhost:8095 (`admin` / `admin123` en dev). Base H2 dans `backend/data/`.
 
-Production (PostgreSQL) : `docker compose up --build`, puis changez `TMS_ADMIN_PASSWORD` et `TMS_ENROLLMENT_KEY`.
+Production : https://tms2m.com (VPS OVH, Docker Compose : Caddy + PostgreSQL + serveur). Mise à jour du serveur :
+```bash
+powershell -ExecutionPolicy Bypass -File deploy\deploy.ps1 -Server 146.59.225.67
+```
+Installation initiale et détails : [deploy/README.md](deploy/README.md).
 
 | Variable | Défaut |
 |---|---|
 | `TMS_ENROLLMENT_KEY` | `CHANGE-ME-ENROLL-KEY` |
 | `TMS_AUTO_ACCEPT` | `true` |
 | `TMS_POLL_INTERVAL` | `60` (secondes) |
+| `TMS_AGENT_AUTO_UPDATE` | `true` (mise à jour automatique de l'agent) |
 | `TMS_ADMIN_USER` / `TMS_ADMIN_PASSWORD` | `admin` / `admin123` |
 | `TMS_APK_DIR` | `./data/apks` |
 | `SERVER_PORT` | `8095` |
@@ -82,6 +128,18 @@ L'URL et la clé sont intégrées à l'APK (staging de masse sans saisie). Elles
 | `newland` | `assembleNewlandDebug` / `Release` | + MESDK Newland (`app/libs/newland/`) : n° de série et firmware officiels (le MESDK ne redémarre pas Android : `NDK_SysReboot` ne redémarre que le processeur sécurisé K21, et n'est donc pas utilisé) |
 | `pax` | `assemblePaxDebug` / `Release` | + NeptuneLite PAX (`app/libs/pax/`) : installation / désinstallation silencieuses, reboot, n° de série / modèle / firmware |
 | `sunmi` | `assembleSunmiDebug` / `Release` | + PayLib Sunmi (`app/libs/sunmi/`) : reboot via `sysPowerManage`, n° de série / modèle officiels |
+
+### Publier une nouvelle version de l'agent
+
+1. Construire les 4 APK de production (signés S2M, URL https://tms2m.com et clé d'enrôlement lues dans `deploy/.env`) :
+   ```bash
+   powershell -ExecutionPolicy Bypass -File tools\build-agent-release.ps1 -Version 1.0.5
+   ```
+   → `android-agent/dist/TMS2M-Agent-<variante>-1.0.5-prod.apk`. Le versionCode vaut `X*100000 + Y*1000 + Z*10 + variante` (0 universal, 1 newland, 2 pax, 3 sunmi) : toujours croissant et unique par variante.
+2. Les publier dans la console : **Applications › Publier un APK** (sélection multiple possible).
+3. Au heartbeat suivant, chaque terminal dont l'agent est plus ancien reçoit l'APK **de sa variante** (suffixe du versionName : `1.0.5-pax`, `1.0.5-newland`…). Une tâche par terminal et par version ; nouvel essai 6 h après un échec ou une confirmation restée sans réponse. Historique : « Mise à jour auto de l'agent ».
+
+Installation silencieuse en Device Owner (N950S) ou via le SDK PAX. Sinon (Sunmi sans Device Owner), une notification « installation à confirmer » s'affiche sur le terminal, sans bloquer la synchronisation. La colonne **Agent** de la liste des terminaux indique qui est à jour. Désactivation : `TMS_AGENT_AUTO_UPDATE=false`.
 
 Le MESDK Newland et PayLib Sunmi **ne fournissent pas d'API d'installation d'APK**. Pour installer en silence sur ces marques, l'agent doit être signé avec la clé système du constructeur. Il en va de même pour le **reboot sur Newland**.
 
@@ -113,8 +171,6 @@ En HTTP clair, c'est à réserver aux tests. En production, il faut un serveur H
 
 Les deux scripts ne ciblent que le constructeur demandé (`-Manufacturer`, `newland` par défaut) : un téléphone branché en même temps est ignoré.
 
-> Sous Windows, placez le projet dans un chemin court (ex. `C:\dev\tms`) : `aidl.exe` échoue au-delà de 260 caractères.
-
 ## Signature par constructeur (important)
 
 Sur les terminaux de production, Newland, PAX et Sunmi n'acceptent **que les APK signés avec leurs clés** (portails développeur constructeur). Pour une installation, une désinstallation ou un redémarrage **silencieux**, l'agent doit être :
@@ -145,10 +201,10 @@ Sur Android 11+, l'application cliente doit déclarer `<queries><package android
 ## API
 
 **Terminal** (`/api/device/v1`, en-tête `X-Device-Token` sauf `/enroll`)
-`POST /enroll` · `POST /heartbeat` · `POST /tasks/{id}/status` · `GET /parameters?packageName=` · `GET /apps/{id}/download`
+`POST /enroll` · `POST /heartbeat` · `GET /wait` (temps réel) · `POST /tasks/{id}/status` · `POST /tasks/{id}/artifact` · `POST /icons/{packageName}` · `GET /parameters?packageName=` · `GET /apps/{id}/download`
 
 **Admin** (`/api/admin/v1`, HTTP Basic)
-`/dashboard` · `/meta` · `/terminals[/{id}[/parameters]]` · `/merchants` · `/groups` · `/apps` · `/parameters` · `/tasks[/{id}/cancel]` · `POST /deployments`
+`/dashboard` · `/meta` · `/terminals[/{id}[/parameters|/metrics|/history]]` · `POST /terminals/{id}/sync` · `/organizations` · `/merchants` · `/groups` · `/apps[/icons/{packageName}]` · `/parameters` · `/deployment-templates` · `/parameter-templates` · `/tasks[/{id}/cancel|/artifact]` · `POST /deployments` · `/audit`
 
 ## Points ouverts (rappels)
 
